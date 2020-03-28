@@ -26,21 +26,43 @@ public class Bubble : MonoBehaviour
     };
 
     public int Number;
+    private GameObject circle;
 
     public Bubble(int number)
     {
         Number = number;
     }
 
+    private int defaultLayer = 0;
+    public bool IgnoreRaycast
+    {
+        get => gameObject.layer == 2 && circle.layer == 2;
+        set
+        {
+            InitCircle();
+            gameObject.layer = value ? 2 : defaultLayer;
+            circle.layer = value ? 2 : defaultLayer;
+        }
+    }
+
+
     // Start is called before the first frame update
     void Start()
     {
-        Instantiate(CirclePrefabs[numberIndexDic[Number]], transform.position, Quaternion.identity, transform);
+        InitCircle();
+    }
+
+    void InitCircle()
+    {
+        if (circle != null)
+            return;
+        circle = Instantiate(CirclePrefabs[numberIndexDic[Number]], transform.position, Quaternion.identity, transform);
+        defaultLayer = gameObject.layer;
     }
 
     // Update is called once per frame
     void Update()
     {
-        
+
     }
 }

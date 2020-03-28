@@ -8,6 +8,10 @@ public class BubbleGrid : MonoBehaviour
 {
     public GameObject BubblePrefab;
     public GameObject Holder;
+    public GameObject LeftWall;
+    public GameObject RightWall;
+    public RectTransform GameAreaRectTransform;
+    public LineRenderer AimLineRenderer;
 
     private const int BubblePerLine = 6; //If you change this number, you should implement scaling bubbles.
 
@@ -15,24 +19,102 @@ public class BubbleGrid : MonoBehaviour
     private readonly List<Bubble[]> grid = new List<Bubble[]>();
     private bool isFirstRight = false;
     private float bubbleSize;
-    private float bubbleDistance;
+    private float bubbleVerticalDistance;
+    private Vector2 shooterPos;
 
     readonly Random random = new Random();
 
     // Start is called before the first frame update
     void Start()
     {
+        shooterPos = new Vector2(0, GameAreaRectTransform.position.y - GameAreaRectTransform.rect.size.y * GameAreaRectTransform.parent.localScale.y / 2f);
+        var bubble = Instantiate(BubblePrefab, shooterPos, Quaternion.identity);
+        bubble.GetComponent<Bubble>().Number = 32;
+        bubble.GetComponent<Bubble>().IgnoreRaycast = true;
         bubbleSize = BubblePrefab.GetComponent<CircleCollider2D>().radius * 2f;
-        bubbleDistance = bubbleSize / 2 * 1.73205080757f; //r * sqrt(3)
-        Holder.transform.localPosition = new Vector3(-bubbleSize * (BubblePerLine - 1) / 2f, 0, 0);
+        bubbleVerticalDistance = bubbleSize / 2 * 1.73205080757f; //r * sqrt(3)
+        Holder.transform.localPosition = new Vector3(-bubbleSize * (BubblePerLine - 1) / 2f, Holder.transform.localPosition.y, 0);
         InitGrid();
 
     }
 
+    private bool isMouseDown = false;
     // Update is called once per frame
     void Update()
     {
+        //We will get either mouse position or touch position
+        Vector2? touchPosition = null;
+        if (Input.GetMouseButtonDown(0))
+            isMouseDown = true;
+        if (Input.GetMouseButtonUp(0))
+            isMouseDown = false;
+        if (isMouseDown)
+            touchPosition = Input.mousePosition;
+        if (Input.touchCount > 0)
+            touchPosition = Input.GetTouch(0).position;
 
+        if (touchPosition != null)
+        {
+            Vector2 touchPositionWorld = Camera.main.ScreenToWorldPoint((Vector3) touchPosition);
+            List<Vector3> positions = new List<Vector3>();
+            positions.Add(shooterPos);
+            var startPoint = shooterPos;
+            var endPoint = touchPositionWorld;
+            Bubble hitBubble = null;
+            GameObject wallToChangeLayer = null;
+            while (true)
+            {
+                var hit2d = Physics2D.Raycast(startPoint, endPoint - startPoint);
+                if (wallToChangeLayer != null)
+                    wallToChangeLayer.layer = 0;
+                if (hit2d.transform == null)
+                    break;
+                positions.Add(hit2d.point);
+                if (hit2d.transform.gameObject.tag == "bubble")
+                {
+                    hitBubble = hit2d.transform.GetComponent<Bubble>();
+                    break;
+                }
+                if (hit2d.transform.gameObject.tag == "wall")
+                {
+                    hit2d.transform.gameObject.layer = 2;
+                    wallToChangeLayer = hit2d.transform.gameObject;
+                    endPoint = new Vector2(shooterPos.x, hit2d.point.y + hit2d.point.y - startPoint.y);
+                    startPoint = hit2d.point;
+                    continue;
+                }
+                break;
+            }
+
+            //if (hit2d.transform != null)
+            //{
+            //    positions.Add(hit2d.point);
+            //    if (hit2d.transform.tag == "wall")
+            //    {
+            //        Debug.DrawLine(shooterPos, shooterPos);
+            //        var wallHit = hit2d;
+            //        wallHit.transform.gameObject.layer = 2;
+            //        //Raycast from hit point to mirrored(y) shooter position
+            //        var mirroredShooterPos = new Vector2(shooterPos.x, wallHit.point.y + wallHit.point.y - shooterPos.y);
+            //        var direction = mirroredShooterPos - wallHit.point;
+            //        hit2d = Physics2D.Raycast(wallHit.point, direction);
+
+            //        if (hit2d.transform != null)
+            //        {
+            //            positions.Add(hit2d.point);
+            //            Debug.Log(hit2d.transform.tag);
+            //        }
+
+            //        wallHit.transform.gameObject.layer = 0;
+            //    }
+            //}
+            //else
+            //{
+            //    positions.Add(touchPositionWorld);
+            //}
+            AimLineRenderer.positionCount = positions.Count;
+            AimLineRenderer.SetPositions(positions.ToArray());
+        }
     }
 
     int GetRandomNumber()
@@ -47,22 +129,19 @@ public class BubbleGrid : MonoBehaviour
         float indent = bubbleSize / 4 * (isFirstRight ? 1 : -1);
         for (int i = 0; i < BubblePerLine; i++)
         {
-            newLine[i] = Instantiate(BubblePrefab, new Vector3(Holder.transform.localPosition.x + i * bubbleSize + indent, transform.localPosition.y, 0), Quaternion.identity, Holder.transform).GetComponent<Bubble>();
+            newLine[i] = Instantiate(BubblePrefab, Holder.transform, true).GetComponent<Bubble>();
+            newLine[i].transform.position = new Vector3(Holder.transform.localPosition.x + i * bubbleSize + indent, transform.localPosition.y, 0);
+            //newLine[i] = Instantiate(BubblePrefab, new Vector3(Holder.transform.localPosition.x + i * bubbleSize + indent, transform.localPosition.y, 0), Quaternion.identity, Holder.transform).GetComponent<Bubble>();
             newLine[i].Number = GetRandomNumber();
         }
 
         grid.Insert(0, newLine);
-        Holder.transform.position = new Vector3(Holder.transform.position.x, Holder.transform.position.y - bubbleDistance, Holder.transform.position.z);
+        Holder.transform.localPosition = new Vector3(Holder.transform.localPosition.x, Holder.transform.localPosition.y - bubbleVerticalDistance, Holder.transform.localPosition.z);
     }
 
 
     void InitGrid()
     {
-        AddNewLine();
-        AddNewLine();
-        AddNewLine();
-        AddNewLine();
-        AddNewLine();
         AddNewLine();
         AddNewLine();
         AddNewLine();
