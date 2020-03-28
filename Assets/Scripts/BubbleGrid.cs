@@ -10,6 +10,7 @@ public class BubbleGrid : MonoBehaviour
     public GameObject Holder;
     public GameObject LeftWall;
     public GameObject RightWall;
+    public GameObject EmptyCircle;
     public RectTransform GameAreaRectTransform;
     public LineRenderer AimLineRenderer;
 
@@ -60,7 +61,7 @@ public class BubbleGrid : MonoBehaviour
             positions.Add(shooterPos);
             var startPoint = shooterPos;
             var endPoint = touchPositionWorld;
-            Bubble hitBubble = null;
+            RaycastHit2D hitBubble = new RaycastHit2D();
             GameObject wallToChangeLayer = null;
             while (true)
             {
@@ -70,12 +71,13 @@ public class BubbleGrid : MonoBehaviour
                 if (hit2d.transform == null)
                     break;
                 positions.Add(hit2d.point);
+                Debug.Log(hit2d.transform.gameObject.tag);
                 if (hit2d.transform.gameObject.tag == "bubble")
                 {
-                    hitBubble = hit2d.transform.GetComponent<Bubble>();
+                    hitBubble = hit2d;
                     break;
                 }
-                if (hit2d.transform.gameObject.tag == "wall")
+                if (positions.Count < 3 && hit2d.transform.gameObject.tag == "wall")
                 {
                     hit2d.transform.gameObject.layer = 2;
                     wallToChangeLayer = hit2d.transform.gameObject;
@@ -86,34 +88,25 @@ public class BubbleGrid : MonoBehaviour
                 break;
             }
 
-            //if (hit2d.transform != null)
-            //{
-            //    positions.Add(hit2d.point);
-            //    if (hit2d.transform.tag == "wall")
-            //    {
-            //        Debug.DrawLine(shooterPos, shooterPos);
-            //        var wallHit = hit2d;
-            //        wallHit.transform.gameObject.layer = 2;
-            //        //Raycast from hit point to mirrored(y) shooter position
-            //        var mirroredShooterPos = new Vector2(shooterPos.x, wallHit.point.y + wallHit.point.y - shooterPos.y);
-            //        var direction = mirroredShooterPos - wallHit.point;
-            //        hit2d = Physics2D.Raycast(wallHit.point, direction);
+            if (hitBubble.transform != null)
+            {
+                AimLineRenderer.positionCount = positions.Count;
+                AimLineRenderer.SetPositions(positions.ToArray());
 
-            //        if (hit2d.transform != null)
-            //        {
-            //            positions.Add(hit2d.point);
-            //            Debug.Log(hit2d.transform.tag);
-            //        }
-
-            //        wallHit.transform.gameObject.layer = 0;
-            //    }
-            //}
-            //else
-            //{
-            //    positions.Add(touchPositionWorld);
-            //}
-            AimLineRenderer.positionCount = positions.Count;
-            AimLineRenderer.SetPositions(positions.ToArray());
+                //Put empty circle
+                //((RaycastHit2D)hitBubble).transform.parent.GetComponent<Bubble>();
+                var hitDir = hitBubble.point - (Vector2)hitBubble.transform.position;
+                var hitAngle = Math.Atan2(hitDir.y, hitDir.x);
+                Debug.Log(hitAngle);
+                if (hitAngle < -Math.PI / 2)
+                    Debug.Log("Left Bottom");
+                else if (hitAngle > -Math.PI / 2)
+                    Debug.Log("Right Bottom");
+            }
+            else
+            {
+                AimLineRenderer.positionCount = 0;
+            }
         }
     }
 
@@ -127,7 +120,7 @@ public class BubbleGrid : MonoBehaviour
         var newLine = new Bubble[BubblePerLine];
         isFirstRight = !isFirstRight;
         float indent = bubbleSize / 4 * (isFirstRight ? 1 : -1);
-        for (int i = 0; i < BubblePerLine; i++)
+        for (int i = 0; i < BubblePerLine; i=+2)
         {
             newLine[i] = Instantiate(BubblePrefab, Holder.transform, true).GetComponent<Bubble>();
             newLine[i].transform.position = new Vector3(Holder.transform.localPosition.x + i * bubbleSize + indent, transform.localPosition.y, 0);
