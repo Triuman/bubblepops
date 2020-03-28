@@ -1,0 +1,97 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &6545680961313183314
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6545680961313183315}
+  - component: {fileID: 6545680961313183317}
+  - component: {fileID: 6545680961313183316}
+  - component: {fileID: 6545680961313183318}
+  m_Layer: 0
+  m_Name: Bubble
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6545680961313183315
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6545680961313183314}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!58 &6545680961313183317
+CircleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6545680961313183314}
+  m_Enabled: 1
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_UsedByComposite: 0
+  m_Offset: {x: 0, y: 0}
+  serializedVersion: 2
+  m_Radius: 0.3725397
+--- !u!50 &6545680961313183316
+Rigidbody2D:
+  serializedVersion: 4
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6545680961313183314}
+  m_BodyType: 1
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDrag: 0
+  m_AngularDrag: 0.05
+  m_GravityScale: 2.08
+  m_Material: {fileID: 0}
+  m_Interpolate: 0
+  m_SleepingMode: 1
+  m_CollisionDetection: 0
+  m_Constraints: 4
+--- !u!114 &6545680961313183318
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6545680961313183314}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb5c471b8519b9346bdef73cb68c1379, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  CirclePrefabs:
+  - {fileID: 1772169331964455476, guid: b67b7ed9347141e45bf41ea90734dfd4, type: 3}
+  - {fileID: 1475619795791986798, guid: 9c51b88bcbfd6f845b7da2a72ac38fa5, type: 3}
+  - {fileID: 2486197077831051415, guid: 82f282888d2dd6e40819236fd1a9ef28, type: 3}
+  - {fileID: 8474710234556068332, guid: 7c096996ce64937439cc1bb88fd72d0c, type: 3}
+  - {fileID: 1610439288210006858, guid: 034a2256094152546ab91184a326305d, type: 3}
+  - {fileID: 1015746150874283140, guid: d3155c23c5b9b4a42a14ff144ef652f4, type: 3}
+  - {fileID: 1341341251640112524, guid: 7280f5fb55dd84e46bd5c0ee67cd111d, type: 3}
+  - {fileID: 2379086378938548555, guid: b1166baf1ab63234cb44cbdec9728afd, type: 3}
+  - {fileID: 5083449750974249130, guid: 0bd133fbb7ee039489a310fd130bc44a, type: 3}
+  - {fileID: 2556740039254525043, guid: 2dc5201f4fe17694c8d530bd926183ad, type: 3}
+  - {fileID: 523827288116434937, guid: 8122f2580d8c014498dabc8b7e8f299d, type: 3}
+  Number: 0
