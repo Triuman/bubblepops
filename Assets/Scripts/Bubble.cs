@@ -87,8 +87,8 @@ public class Bubble : MonoBehaviour
         }
         if (targetPositions.Count > 0)
         {
-            transform.position = Vector3.MoveTowards(transform.position, targetPositions[0], moveSpeed * Time.deltaTime);
-            if (Vector3.Distance(transform.position, targetPositions[0]) < 0.001f)
+            transform.localPosition = Vector3.MoveTowards(transform.localPosition, targetPositions[0], moveSpeed * Time.deltaTime);
+            if (Vector3.Distance(transform.localPosition, targetPositions[0]) < 0.001f)
             {
                 targetPositions.RemoveAt(0);
                 if(targetPositions.Count == 0)

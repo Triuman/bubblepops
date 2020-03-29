@@ -19,8 +19,8 @@ public class BubbleGrid : MonoBehaviour
     private bool isFirstRight = false;
     private float bubbleSize;
     private float bubbleVerticalDistance;
-    private Vector2 shooterPos;
-    Vector2 _emptyCircleGridPos = new Vector2(-1, -1);
+    private Vector3 shooterPos;
+    Vector2Int _emptyCircleGridPos = new Vector2Int(-1, -1);
     private bool isMouseDown = false;
     Vector2? touchPositionWorld = null;
     Vector3 holderTargetPos;
@@ -77,6 +77,14 @@ public class BubbleGrid : MonoBehaviour
         PutNextBubbleToShooter();
     }
 
+    Vector3 GlobalPositionToScaledHolderPosition(Vector3 position)
+    {
+        return new Vector3(
+            position.x / Holder.transform.lossyScale.x,
+            position.y / Holder.transform.lossyScale.y,
+            position.z / Holder.transform.lossyScale.z
+            );
+    }
 
     void PutNextBubbleToShooter()
     {
@@ -89,7 +97,7 @@ public class BubbleGrid : MonoBehaviour
         waitingQueue.RemoveAt(0);
         shooterCurrentBubble.transform.position = new Vector3(shooterCurrentBubble.transform.position.x, shooterCurrentBubble.transform.position.y, BubblePrefab.transform.localPosition.z);
         shooterCurrentBubble.ScaleTo(new List<Vector2>() { shooterCurrentBubble.transform.localScale / 0.7f }, 0.6f);
-        shooterCurrentBubble.MoveTo(new List<Vector3>() { shooterPos }, 4);
+        shooterCurrentBubble.MoveTo(new List<Vector3>() { GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position) }, 4);
         AddAnimationState(EnumAnimationStates.PuttingBubbleToShooter);
         shooterCurrentBubble.Arrived += OnBubbleArrivedToShooter;
     }
@@ -119,11 +127,11 @@ public class BubbleGrid : MonoBehaviour
         {
             if (Input.GetMouseButtonUp(0))
             {
+                EmptyCircle.gameObject.SetActive(false);
                 var shootDestinations = new List<Vector3>();
                 if (AimLineRenderer.positionCount > 2)
-                    shootDestinations.Add(AimLineRenderer.GetPosition(1));
-                shootDestinations.Add(new Vector3(Holder.transform.position.x + _emptyCircleGridPos[1] * bubbleSize + GetLineIndent((int)_emptyCircleGridPos[0]), transform.position.y - (_emptyCircleGridPos[0] + 1) * bubbleVerticalDistance, BubblePrefab.transform.position.z));
-
+                    shootDestinations.Add(GlobalPositionToScaledHolderPosition(AimLineRenderer.GetPosition(1) - Holder.transform.position));
+                shootDestinations.Add(GlobalPositionToScaledHolderPosition(new Vector3(_emptyCircleGridPos[1] * bubbleSize + GetLineIndent((int)_emptyCircleGridPos[0]), transform.position.y - (_emptyCircleGridPos[0] + 1) * bubbleVerticalDistance - Holder.transform.position.y, BubblePrefab.transform.position.z)));
                 ShootTheBubble(shootDestinations);
             }
             else
@@ -134,6 +142,14 @@ public class BubbleGrid : MonoBehaviour
             if (IsInAnimationState(EnumAnimationStates.AddingNewLine))
             {
                 Holder.transform.localPosition = Vector3.MoveTowards(Holder.transform.localPosition, holderTargetPos, 5 * Time.deltaTime);
+                //We move the shooter bubble and queue bubbles so they stay where they were comparing to screen.
+                shooterCurrentBubble.transform.localPosition =
+                    GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position);
+                foreach (Bubble bubble in waitingQueue.ToArray())
+                {
+                    bubble.transform.localPosition =
+                        GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position + new Vector3(-bubbleSize, 0));
+                }
                 if (Vector3.Distance(Holder.transform.localPosition, holderTargetPos) < 0.001f)
                 {
                     RemoveAnimationState(EnumAnimationStates.AddingNewLine);
@@ -144,10 +160,7 @@ public class BubbleGrid : MonoBehaviour
 
     void InitGrid()
     {
-        AddNewLine(false);
-        AddNewLine(false);
-        AddNewLine(false);
-        AddNewLine();
+        //AddNewLine();
     }
 
 
@@ -164,7 +177,7 @@ public class BubbleGrid : MonoBehaviour
         //And will draw the aim line.
         List<Vector3> positions = new List<Vector3> { shooterPos };
         var startPoint = shooterPos;
-        var endPoint = (Vector2)touchPositionWorld;
+        var endPoint = (Vector3)touchPositionWorld;
 
         var hit1 = Physics2D.Raycast(startPoint, endPoint - startPoint);
         RaycastHit2D hit2;
@@ -192,7 +205,7 @@ public class BubbleGrid : MonoBehaviour
             hit2 = hit1;
         }
 
-        Vector2? emptyCircleGridPos = null;
+        Vector2Int? emptyCircleGridPos = null;
         if (hit2.transform.gameObject.tag == "bubble")
         {
             if (hit2.transform == null)
@@ -213,7 +226,7 @@ public class BubbleGrid : MonoBehaviour
 
         if (emptyCircleGridPos != null)
         {
-            PlaceEmptyCircle((Vector2)emptyCircleGridPos);
+            PlaceEmptyCircle((Vector2Int)emptyCircleGridPos);
             AimLineRenderer.positionCount = positions.Count;
             AimLineRenderer.SetPositions(positions.ToArray());
         }
@@ -268,21 +281,21 @@ public class BubbleGrid : MonoBehaviour
         PutNextBubbleToShooter();
         DisturbOthers(_emptyCircleGridPos);
         RemoveAnimationState(EnumAnimationStates.Shooting);
-        //AddNewLine();
+        AddNewLine();
     }
 
-    void DisturbOthers(Vector2 gridPos)
+    void DisturbOthers(Vector2Int gridPos)
     {
         //As this is not a blocking animation, we don't set animation state.
         bool isRight = isFirstRight ? (int)gridPos[0] % 2 == 0 : (int)gridPos[0] % 2 == 1;
-        Vector2[] surroundingGridPosDiffs = new[]
+        Vector2Int[] surroundingGridPosDiffs = new[]
         {
-            new Vector2(0, -1), //left
-            new Vector2(-1, isRight ? 0 : -1), //left up
-            new Vector2(-1, isRight ? 1 : 0), //right up
-            new Vector2(0, 1), //right
-            new Vector2(1, isRight ? 1 : 0), //right down
-            new Vector2(1, isRight ? 0 : -1) //left down
+            new Vector2Int(0, -1), //left
+            new Vector2Int(-1, isRight ? 0 : -1), //left up
+            new Vector2Int(-1, isRight ? 1 : 0), //right up
+            new Vector2Int(0, 1), //right
+            new Vector2Int(1, isRight ? 1 : 0), //right down
+            new Vector2Int(1, isRight ? 0 : -1) //left down
         };
         float distance = 0.1f;
         for (int i = 0; i < 6; i++)
@@ -295,44 +308,44 @@ public class BubbleGrid : MonoBehaviour
                 Vector3 direction = new Vector3((float)Math.Cos(angle), -(float)Math.Sin(angle));
                 bubble.MoveTo(new List<Vector3>()
                 {
-                    bubble.transform.position + direction * distance,
-                    bubble.transform.position,
+                    bubble.transform.localPosition + direction * distance,
+                    bubble.transform.localPosition,
                 }, 1);
             }
         }
     }
 
 
-    Vector2 GetGridPosFromTopWallHit(RaycastHit2D topWallHit2D)
+    Vector2Int GetGridPosFromTopWallHit(RaycastHit2D topWallHit2D)
     {
-        return new Vector2(0, (float)Math.Floor((topWallHit2D.point.x - Holder.transform.position.x - GetLineIndent(0) + bubbleSize / 2) / bubbleSize));
+        return new Vector2Int(0, (int)Math.Floor((topWallHit2D.point.x - Holder.transform.position.x - GetLineIndent(0) + bubbleSize / 2) / bubbleSize));
     }
 
-    Vector2 GetGridPosFromBubbleHit(RaycastHit2D bubbleHit2D)
+    Vector2Int GetGridPosFromBubbleHit(RaycastHit2D bubbleHit2D)
     {
         //Put empty circle
         var hitBubble = bubbleHit2D.transform.parent.GetComponent<Bubble>();
-        Vector2 hitBubbleGridPos = new Vector2(-1, -1);
+        Vector2Int hitBubbleGridPos = new Vector2Int(-1, -1);
         for (int l = 0; l < grid.Count; l++)
         {
             for (int i = 0; i < grid[l].Length; i++)
             {
                 if (grid[l][i] != null && grid[l][i].Id == hitBubble.Id)
                 {
-                    hitBubbleGridPos = new Vector2(l, i);
+                    hitBubbleGridPos = new Vector2Int(l, i);
                     break;
                 }
             }
             if (hitBubbleGridPos[0] > -1)
                 break;
         }
-        Vector2 emptyCircleGridPos = new Vector2();
+        Vector2Int emptyCircleGridPos = new Vector2Int();
         var hitDir = bubbleHit2D.point - (Vector2)bubbleHit2D.transform.position;
         var hitAngle = Math.Atan2(hitDir.y, hitDir.x);
         bool isHitLineRight = isFirstRight ? (int)hitBubbleGridPos[0] % 2 == 0 : (int)hitBubbleGridPos[0] % 2 == 1;
         if (hitAngle <= -Math.PI / 2) //left bottom
         {
-            emptyCircleGridPos = hitBubbleGridPos + new Vector2(1, -1 + (isHitLineRight ? 1 : 0));
+            emptyCircleGridPos = hitBubbleGridPos + new Vector2Int(1, -1 + (isHitLineRight ? 1 : 0));
             if (grid.Count > (int)emptyCircleGridPos[0] && grid[(int)emptyCircleGridPos[0]][(int)emptyCircleGridPos[1]] != null)
             {
                 if (hitAngle <= -Math.PI / 2 - Math.PI / 4) //left
@@ -348,7 +361,7 @@ public class BubbleGrid : MonoBehaviour
         }
         else if (hitAngle > -Math.PI / 2 && hitAngle < 0) //right bottom
         {
-            emptyCircleGridPos = hitBubbleGridPos + new Vector2(1, 1 + (isHitLineRight ? 0 : -1));
+            emptyCircleGridPos = hitBubbleGridPos + new Vector2Int(1, 1 + (isHitLineRight ? 0 : -1));
             if (grid.Count > (int)emptyCircleGridPos[0] && grid[(int)emptyCircleGridPos[0]][(int)emptyCircleGridPos[1]] != null)
             {
 
@@ -365,16 +378,16 @@ public class BubbleGrid : MonoBehaviour
         }
         else if (hitAngle > Math.PI / 2) //left
         {
-            emptyCircleGridPos = hitBubbleGridPos + new Vector2(0, -1);
+            emptyCircleGridPos = hitBubbleGridPos + new Vector2Int(0, -1);
         }
         else if (hitAngle < Math.PI / 2) //right
         {
-            emptyCircleGridPos = hitBubbleGridPos + new Vector2(0, 1);
+            emptyCircleGridPos = hitBubbleGridPos + new Vector2Int(0, 1);
         }
         return emptyCircleGridPos;
     }
 
-    void PlaceEmptyCircle(Vector2 newGridPos)
+    void PlaceEmptyCircle(Vector2Int newGridPos)
     {
         if (grid.Count > (int)newGridPos[0])
         {
