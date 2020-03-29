@@ -8,8 +8,6 @@ public class BubbleGrid : MonoBehaviour
 {
     public GameObject BubblePrefab;
     public GameObject Holder;
-    public GameObject LeftWall;
-    public GameObject RightWall;
     public GameObject EmptyCircle;
     public RectTransform GameAreaRectTransform;
     public LineRenderer AimLineRenderer;
@@ -22,6 +20,9 @@ public class BubbleGrid : MonoBehaviour
     private float bubbleSize;
     private float bubbleVerticalDistance;
     private Vector2 shooterPos;
+
+    private Bubble shooterCurrentBubble;
+    private Bubble shooterNextBubble;
 
     readonly Random random = new Random();
 
@@ -40,6 +41,7 @@ public class BubbleGrid : MonoBehaviour
     }
 
     private bool isMouseDown = false;
+    Vector2 emptyCircleGridPos = new Vector2(-1, -1);
     // Update is called once per frame
     void Update()
     {
@@ -48,7 +50,14 @@ public class BubbleGrid : MonoBehaviour
         if (Input.GetMouseButtonDown(0))
             isMouseDown = true;
         if (Input.GetMouseButtonUp(0))
+        {
             isMouseDown = false;
+            if (emptyCircleGridPos[0] > -1 && emptyCircleGridPos[1] > -1)
+            {
+                //TODO: shoot the ball to target area
+                AddNewBubble((int)emptyCircleGridPos[0], (int)emptyCircleGridPos[1], GetRandomNumber());
+            }
+        }
         if (isMouseDown)
             touchPosition = Input.mousePosition;
         if (Input.touchCount > 0)
@@ -56,12 +65,12 @@ public class BubbleGrid : MonoBehaviour
 
         if (touchPosition != null)
         {
-            Vector2 touchPositionWorld = Camera.main.ScreenToWorldPoint((Vector3) touchPosition);
+            Vector2 touchPositionWorld = Camera.main.ScreenToWorldPoint((Vector3)touchPosition);
             List<Vector3> positions = new List<Vector3>();
             positions.Add(shooterPos);
             var startPoint = shooterPos;
             var endPoint = touchPositionWorld;
-            RaycastHit2D hitBubble = new RaycastHit2D();
+            RaycastHit2D circleHit2D = new RaycastHit2D();
             GameObject wallToChangeLayer = null;
             while (true)
             {
@@ -71,10 +80,15 @@ public class BubbleGrid : MonoBehaviour
                 if (hit2d.transform == null)
                     break;
                 positions.Add(hit2d.point);
-                Debug.Log(hit2d.transform.gameObject.tag);
                 if (hit2d.transform.gameObject.tag == "bubble")
                 {
-                    hitBubble = hit2d;
+                    circleHit2D = hit2d;
+                    break;
+                }
+
+                if (hit2d.transform.gameObject.tag == "topwall")
+                {
+                    circleHit2D = hit2d;
                     break;
                 }
                 if (positions.Count < 3 && hit2d.transform.gameObject.tag == "wall")
@@ -88,20 +102,58 @@ public class BubbleGrid : MonoBehaviour
                 break;
             }
 
-            if (hitBubble.transform != null)
+            if (circleHit2D.transform != null)
             {
                 AimLineRenderer.positionCount = positions.Count;
                 AimLineRenderer.SetPositions(positions.ToArray());
 
                 //Put empty circle
-                //((RaycastHit2D)hitBubble).transform.parent.GetComponent<Bubble>();
-                var hitDir = hitBubble.point - (Vector2)hitBubble.transform.position;
+                var hitBubble = circleHit2D.transform.parent.GetComponent<Bubble>();
+                Vector2 hitBubbleGridPos = new Vector2(-1, -1);
+                for (int l = 0; l < grid.Count; l++)
+                {
+                    for (int i = 0; i < grid[l].Length; i++)
+                    {
+                        if (grid[l][i] != null && grid[l][i].Id == hitBubble.Id)
+                        {
+                            hitBubbleGridPos = new Vector2(l, i);
+                            break;
+                        }
+                    }
+                    if (hitBubbleGridPos[0] > -1)
+                        break;
+                }
+                var hitDir = circleHit2D.point - (Vector2)circleHit2D.transform.position;
                 var hitAngle = Math.Atan2(hitDir.y, hitDir.x);
-                Debug.Log(hitAngle);
-                if (hitAngle < -Math.PI / 2)
-                    Debug.Log("Left Bottom");
-                else if (hitAngle > -Math.PI / 2)
-                    Debug.Log("Right Bottom");
+                bool isHitLineRight = isFirstRight ? (int)hitBubbleGridPos.x % 2 == 0 : (int)hitBubbleGridPos.x % 2 == 1;
+                var prevEmptyCircleGridPos = new Vector2(emptyCircleGridPos[0], emptyCircleGridPos[1]);
+                if (hitAngle <= -Math.PI / 2) //left bottom
+                {
+                    EmptyCircle.transform.position = new Vector2(circleHit2D.transform.position.x - bubbleSize / 2, circleHit2D.transform.position.y - bubbleVerticalDistance);
+                    emptyCircleGridPos = hitBubbleGridPos + new Vector2(1, -1 + (isHitLineRight ? 1 : 0));
+                }
+                else if (hitAngle > -Math.PI / 2 && hitAngle < 0) //right bottom
+                {
+                    EmptyCircle.transform.position = new Vector2(circleHit2D.transform.position.x + bubbleSize / 2, circleHit2D.transform.position.y - bubbleVerticalDistance);
+                    emptyCircleGridPos = hitBubbleGridPos + new Vector2(1, 1 + (isHitLineRight ? 0 : -1));
+                }
+                else if (hitAngle > Math.PI / 2) //left
+                {
+                    EmptyCircle.transform.position = new Vector2(circleHit2D.transform.position.x - bubbleSize, circleHit2D.transform.position.y);
+                    emptyCircleGridPos = hitBubbleGridPos + new Vector2(0, -1);
+                }
+                else if (hitAngle < Math.PI / 2) //right
+                {
+                    EmptyCircle.transform.position = new Vector2(circleHit2D.transform.position.x + bubbleSize, circleHit2D.transform.position.y);
+                    emptyCircleGridPos = hitBubbleGridPos + new Vector2(0, 1);
+                }
+
+                if ((int) prevEmptyCircleGridPos[0] != (int) emptyCircleGridPos[0] ||
+                    (int) prevEmptyCircleGridPos[1] != (int) emptyCircleGridPos[1])
+                {
+                    //EmptyCircle.GetComponent<SpriteRenderer>().color = Globals.NumberColorDic[shooterCurrentBubble.Number];
+                    EmptyCircle.GetComponent<Animator>().Play("EmptyCircleGrow");
+                }
             }
             else
             {
@@ -119,12 +171,10 @@ public class BubbleGrid : MonoBehaviour
     {
         var newLine = new Bubble[BubblePerLine];
         isFirstRight = !isFirstRight;
-        float indent = bubbleSize / 4 * (isFirstRight ? 1 : -1);
-        for (int i = 0; i < BubblePerLine; i=+2)
+        for (int i = 0; i < BubblePerLine; i += 2)
         {
             newLine[i] = Instantiate(BubblePrefab, Holder.transform, true).GetComponent<Bubble>();
-            newLine[i].transform.position = new Vector3(Holder.transform.localPosition.x + i * bubbleSize + indent, transform.localPosition.y, 0);
-            //newLine[i] = Instantiate(BubblePrefab, new Vector3(Holder.transform.localPosition.x + i * bubbleSize + indent, transform.localPosition.y, 0), Quaternion.identity, Holder.transform).GetComponent<Bubble>();
+            newLine[i].transform.position = new Vector3(Holder.transform.position.x + i * bubbleSize + GetLineIndent(0), transform.position.y, 0);
             newLine[i].Number = GetRandomNumber();
         }
 
@@ -141,9 +191,23 @@ public class BubbleGrid : MonoBehaviour
         AddNewLine();
     }
 
+    bool IsLineRight(int lineIndex)
+    {
+        return isFirstRight ? lineIndex % 2 == 0 : lineIndex % 2 == 1;
+    }
+
+    float GetLineIndent(int lineIndex)
+    {
+        return bubbleSize / 4 * (IsLineRight(lineIndex) ? 1 : -1);
+    }
+
     void AddNewBubble(int lineIndex, int columnIndex, int number)
     {
-        grid[lineIndex][columnIndex] = new Bubble(number);
+        if(lineIndex == grid.Count)
+            grid.Add(new Bubble[6]);
+        grid[lineIndex][columnIndex] = Instantiate(BubblePrefab, Holder.transform, true).GetComponent<Bubble>();
+        grid[lineIndex][columnIndex].transform.position = new Vector3(Holder.transform.position.x + columnIndex * bubbleSize + GetLineIndent(lineIndex), transform.position.y - (lineIndex + 1) * bubbleVerticalDistance, 0);
+        grid[lineIndex][columnIndex].Number = number;
         //TODO: Check effect of this bubble
     }
 

@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 /// <summary>
 /// This bubble will destroy itself when hit the bottom or popped and play an animation along with a sound.
@@ -10,29 +11,12 @@ public class Bubble : MonoBehaviour
 {
     public List<GameObject> CirclePrefabs;
 
-    static Dictionary<int, int> numberIndexDic = new Dictionary<int, int>()
-    {
-        { 2, 0 },
-        { 4, 1 },
-        { 8, 2 },
-        { 16, 3 },
-        { 32, 4 },
-        { 64, 5 },
-        { 128, 6 },
-        { 256, 7 },
-        { 512, 8 },
-        { 1024, 9 },
-        { 2048, 10 },
-    };
 
+    //We will use this Id to quickly find a hit bubble in the grid.
+    public int Id { get; private set; }
     public int Number;
     private GameObject circle;
-
-    public Bubble(int number)
-    {
-        Number = number;
-    }
-
+    
     private int defaultLayer = 0;
     public bool IgnoreRaycast
     {
@@ -49,6 +33,7 @@ public class Bubble : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        Id = Random.Range(1, 10000000);
         InitCircle();
     }
 
@@ -56,7 +41,7 @@ public class Bubble : MonoBehaviour
     {
         if (circle != null)
             return;
-        circle = Instantiate(CirclePrefabs[numberIndexDic[Number]], transform.position, Quaternion.identity, transform);
+        circle = Instantiate(CirclePrefabs[Globals.NumberIndexDic[Number]], transform.position, Quaternion.identity, transform);
         defaultLayer = gameObject.layer;
     }
 

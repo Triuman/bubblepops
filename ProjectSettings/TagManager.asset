@@ -6,6 +6,7 @@ TagManager:
   tags:
   - wall
   - bubble
+  - topwall
   layers:
   - Default
   - TransparentFX
