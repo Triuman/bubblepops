@@ -163,10 +163,6 @@ public class BubbleGrid : MonoBehaviour
     {
         AddNewLine(false);
         AddNewLine(false);
-        AddNewLine(false);
-        AddNewLine(false);
-        AddNewLine(false);
-        AddNewLine(false);
     }
 
 
@@ -466,7 +462,7 @@ public class BubbleGrid : MonoBehaviour
 
     static Bubble GetBubble(List<Bubble[]> virtualGrid, int lineIndex, int columnIndex)
     {
-        if (virtualGrid.Count <= lineIndex)
+        if (virtualGrid.Count <= lineIndex || lineIndex < 0 || columnIndex < 0 || columnIndex >= 6)
             return null;
         Debug.LogWarning(lineIndex);
         Debug.LogWarning(columnIndex);
@@ -478,7 +474,7 @@ public class BubbleGrid : MonoBehaviour
     }
 
 
-    static void GetConnectedBubbles(List<Bubble[]> virtualGrid, bool isFirstRight, Vector2Int bubbleGridPos, int number, EnumDirections ignoredDirection, List<BubbleConnection> sameConnections)
+    static void GetConnectedBubblesWithSameNumber(List<Bubble[]> virtualGrid, bool isFirstRight, Vector2Int bubbleGridPos, int number, EnumDirections ignoredDirection, BubbleConnection parentConnection)
     {
         //find if to right or left
         bool isRight = isFirstRight ? bubbleGridPos[0] % 2 == 0 : bubbleGridPos[0] % 2 == 1;
@@ -491,142 +487,162 @@ public class BubbleGrid : MonoBehaviour
         {
             var leftBubblePos = new Vector2Int(bubbleGridPos[0], bubbleGridPos[1] - 1);
             var bubble = GetBubble(virtualGrid, leftBubblePos);
-            if (bubble != null && bubble.Number == number && !sameConnections.Any(b => b.GridPosition.Equals(leftBubblePos)))
+            if (bubble != null && bubble.Number == number && !parentConnection.Connections.Any(b => b.GridPosition.Equals(leftBubblePos)))
             {
                 var newConnection = new BubbleConnection()
                 {
                     Number = number,
                     GridPosition = leftBubblePos,
-                    Connections = new List<BubbleConnection>()
+                    Connections = new List<BubbleConnection>(),
+                    ParentConnection = parentConnection
                 };
-                sameConnections.Add(newConnection);
-                GetConnectedBubbles(virtualGrid, isFirstRight, leftBubblePos, number, EnumDirections.Right, sameConnections);
+                parentConnection.Connections.Add(newConnection);
+                GetConnectedBubblesWithSameNumber(virtualGrid, isFirstRight, leftBubblePos, number, EnumDirections.Right, parentConnection);
             }
         }
 
         if (ignoredDirection != EnumDirections.Left && ignoredDirection != EnumDirections.LeftUp &&
             ignoredDirection != EnumDirections.RightUp)
         {
-            var leftUpBubblePos = new Vector2Int(bubbleGridPos[0] + 1, bubbleGridPos[1] + (isRight ? 0 : -1));
+            var leftUpBubblePos = new Vector2Int(bubbleGridPos[0] - 1, bubbleGridPos[1] + (isRight ? 0 : -1));
             var bubble = GetBubble(virtualGrid, leftUpBubblePos);
-            if (bubble != null && bubble.Number == number && !sameConnections.Any(b => b.GridPosition.Equals(leftUpBubblePos)))
+            if (bubble != null && bubble.Number == number && !parentConnection.Connections.Any(b => b.GridPosition.Equals(leftUpBubblePos)))
             {
                 var newConnection = new BubbleConnection()
                 {
                     Number = number,
                     GridPosition = leftUpBubblePos,
-                    Connections = new List<BubbleConnection>()
+                    Connections = new List<BubbleConnection>(),
+                    ParentConnection = parentConnection
                 };
-                sameConnections.Add(newConnection);
-                GetConnectedBubbles(virtualGrid, isFirstRight, leftUpBubblePos, number, EnumDirections.RightDown, sameConnections);
+                parentConnection.Connections.Add(newConnection);
+                GetConnectedBubblesWithSameNumber(virtualGrid, isFirstRight, leftUpBubblePos, number, EnumDirections.RightDown, parentConnection);
             }
         }
 
         if (ignoredDirection != EnumDirections.LeftUp && ignoredDirection != EnumDirections.RightUp &&
             ignoredDirection != EnumDirections.Right)
         {
-            var rightUpBubblePos = new Vector2Int(bubbleGridPos[0] + 1, bubbleGridPos[1] + (isRight ? 1 : 0));
+            var rightUpBubblePos = new Vector2Int(bubbleGridPos[0] - 1, bubbleGridPos[1] + (isRight ? 1 : 0));
             var bubble = GetBubble(virtualGrid, rightUpBubblePos);
-            if (bubble != null && bubble.Number == number && !sameConnections.Any(b => b.GridPosition.Equals(rightUpBubblePos)))
+            if (bubble != null && bubble.Number == number && !parentConnection.Connections.Any(b => b.GridPosition.Equals(rightUpBubblePos)))
             {
                 var newConnection = new BubbleConnection()
                 {
                     Number = number,
                     GridPosition = rightUpBubblePos,
-                    Connections = new List<BubbleConnection>()
+                    Connections = new List<BubbleConnection>(),
+                    ParentConnection = parentConnection
                 };
-                sameConnections.Add(newConnection);
-                GetConnectedBubbles(virtualGrid, isFirstRight, rightUpBubblePos, number, EnumDirections.LeftDown, sameConnections);
+                parentConnection.Connections.Add(newConnection);
+                GetConnectedBubblesWithSameNumber(virtualGrid, isFirstRight, rightUpBubblePos, number, EnumDirections.LeftDown, parentConnection);
             }
         }
 
         if (ignoredDirection != EnumDirections.RightUp && ignoredDirection != EnumDirections.Right &&
             ignoredDirection != EnumDirections.RightDown)
         {
-            var rightBubblePos = new Vector2Int(bubbleGridPos[0] + 1, bubbleGridPos[1] + 1);
+            var rightBubblePos = new Vector2Int(bubbleGridPos[0], bubbleGridPos[1] + 1);
             var bubble = GetBubble(virtualGrid, rightBubblePos);
-            if (bubble != null && bubble.Number == number && !sameConnections.Any(b => b.GridPosition.Equals(rightBubblePos)))
+            if (bubble != null && bubble.Number == number && !parentConnection.Connections.Any(b => b.GridPosition.Equals(rightBubblePos)))
             {
                 var newConnection = new BubbleConnection()
                 {
                     Number = number,
                     GridPosition = rightBubblePos,
-                    Connections = new List<BubbleConnection>()
+                    Connections = new List<BubbleConnection>(),
+                    ParentConnection = parentConnection
                 };
-                sameConnections.Add(newConnection);
-                GetConnectedBubbles(virtualGrid, isFirstRight, rightBubblePos, number, EnumDirections.Left, sameConnections);
+                parentConnection.Connections.Add(newConnection);
+                GetConnectedBubblesWithSameNumber(virtualGrid, isFirstRight, rightBubblePos, number, EnumDirections.Left, parentConnection);
             }
         }
 
         if (ignoredDirection != EnumDirections.Right && ignoredDirection != EnumDirections.RightDown &&
             ignoredDirection != EnumDirections.LeftDown)
         {
-            var rightDownBubblePos = new Vector2Int(bubbleGridPos[0] - 1, bubbleGridPos[1] + (isRight ? 1 : 0));
+            var rightDownBubblePos = new Vector2Int(bubbleGridPos[0] + 1, bubbleGridPos[1] + (isRight ? 1 : 0));
             var bubble = GetBubble(virtualGrid, rightDownBubblePos);
-            if (bubble != null && bubble.Number == number && !sameConnections.Any(b => b.GridPosition.Equals(rightDownBubblePos)))
+            if (bubble != null && bubble.Number == number && !parentConnection.Connections.Any(b => b.GridPosition.Equals(rightDownBubblePos)))
             {
                 var newConnection = new BubbleConnection()
                 {
                     Number = number,
                     GridPosition = rightDownBubblePos,
-                    Connections = new List<BubbleConnection>()
+                    Connections = new List<BubbleConnection>(),
+                    ParentConnection = parentConnection
                 };
-                sameConnections.Add(newConnection);
-                GetConnectedBubbles(virtualGrid, isFirstRight, rightDownBubblePos, number, EnumDirections.LeftUp, sameConnections);
+                parentConnection.Connections.Add(newConnection);
+                GetConnectedBubblesWithSameNumber(virtualGrid, isFirstRight, rightDownBubblePos, number, EnumDirections.LeftUp, parentConnection);
             }
         }
 
         if (ignoredDirection != EnumDirections.Left && ignoredDirection != EnumDirections.LeftDown &&
             ignoredDirection != EnumDirections.RightDown)
         {
-            var leftDownBubblePos = new Vector2Int(bubbleGridPos[0] - 1, bubbleGridPos[1] + (isRight ? 0 : -1));
+            var leftDownBubblePos = new Vector2Int(bubbleGridPos[0] + 1, bubbleGridPos[1] + (isRight ? 0 : -1));
             var bubble = GetBubble(virtualGrid, leftDownBubblePos);
-            if (bubble != null && bubble.Number == number && !sameConnections.Any(b => b.GridPosition.Equals(leftDownBubblePos)))
+            if (bubble != null && bubble.Number == number && !parentConnection.Connections.Any(b => b.GridPosition.Equals(leftDownBubblePos)))
             {
                 var newConnection = new BubbleConnection()
                 {
                     Number = number,
                     GridPosition = leftDownBubblePos,
-                    Connections = new List<BubbleConnection>()
+                    Connections = new List<BubbleConnection>(),
+                    ParentConnection = parentConnection
                 };
-                sameConnections.Add(newConnection);
-                GetConnectedBubbles(virtualGrid, isFirstRight, leftDownBubblePos, number, EnumDirections.RightUp, sameConnections);
+                parentConnection.Connections.Add(newConnection);
+                GetConnectedBubblesWithSameNumber(virtualGrid, isFirstRight, leftDownBubblePos, number, EnumDirections.RightUp, parentConnection);
             }
         }
-
-
-        //TODO: We also need to decide where to connect while doing this calculations.
-
+        
     }
+
+    //TODO: Put a favourity scale. if 1, we will choose the deepest path. if 0, we will choose the shortest.
 
     void CalculateAndAnimatePops(Vector2Int bubbleGridPos)
     {
         var virtualGrid = grid.ToList();
 
-        var connections = new List<BubbleConnection>();
-        connections.Add(new BubbleConnection()
+        var rootConnection = new BubbleConnection()
         {
             Number = GetBubble(virtualGrid, bubbleGridPos).Number,
             GridPosition = bubbleGridPos,
             Connections = new List<BubbleConnection>()
-        });
-        GetConnectedBubbles(virtualGrid, isFirstRight, bubbleGridPos, connections[0].Number, EnumDirections.None, connections);
-
-        while (true)
+        };
+        //We add same object without reference to prevent infinite loop.
+        rootConnection.Connections.Add(new BubbleConnection()
         {
-            foreach (var bubbleConnection in connections)
-            {
-                GetConnectedBubbles(virtualGrid, isFirstRight, bubbleConnection.GridPosition, GetMergeResultNumber(bubbleConnection.Number, connections.Count), EnumDirections.None, bubbleConnection.Connections);
-            }
+            Number = GetBubble(virtualGrid, bubbleGridPos).Number,
+            GridPosition = bubbleGridPos,
+            Connections = new List<BubbleConnection>(),
+            ParentConnection = rootConnection
+        });
+        
+        GetConnectedBubblesWithSameNumber(virtualGrid, isFirstRight, bubbleGridPos, rootConnection.Number, EnumDirections.None, rootConnection);
+
+        //As there is a exception on NextNumber for the first level, we call this once manually.
+        foreach (var innerConnection in rootConnection.Connections)
+        {
+            GetConnectedBubblesWithSameNumber(virtualGrid, isFirstRight, innerConnection.GridPosition, GetMergeResultNumber(rootConnection.Number, rootConnection.Connections.Count), EnumDirections.None, innerConnection);
+            if (innerConnection.Connections.Count > 0)
+                FindDeepConnections(virtualGrid, isFirstRight, innerConnection);
         }
+        
 
-        Debug.Log("");
-
-
-
-
+        
         //TODO: find the deepest connection and start animating
 
+    }
+
+    static void FindDeepConnections(List<Bubble[]> virtualGrid, bool isFirstRight, BubbleConnection connection)
+    {
+        foreach (var innerConnection in connection.Connections)
+        {
+            GetConnectedBubblesWithSameNumber(virtualGrid, isFirstRight, innerConnection.GridPosition, innerConnection.NextNumber, EnumDirections.None, innerConnection);
+            if(innerConnection.Connections.Count > 0)
+                FindDeepConnections(virtualGrid, isFirstRight, innerConnection);
+        }
     }
 
     static int GetMergeResultNumber(int number, int count)
@@ -637,6 +653,13 @@ public class BubbleGrid : MonoBehaviour
     class BubbleConnection
     {
         public int Number { get; set; }
+
+        public int NextNumber
+        {
+            get { return GetMergeResultNumber(Number, ParentConnection.Connections.Count + 1); }
+        }
+
+        public BubbleConnection ParentConnection { get; set; }
         public Vector2Int GridPosition { get; set; }
         public List<BubbleConnection> Connections { get; set; }
     }
