@@ -11,23 +11,28 @@ public class Bubble : MonoBehaviour
 {
     public List<GameObject> CirclePrefabs;
 
-    public event Action Arrived;
+    public event Action<Bubble> Arrived;
 
     //We will use this Id to quickly find a hit bubble in the grid.
     public int Id { get; private set; }
     public int Number = 2;
-    public float ShootSpeed;
     private GameObject circle;
     
     private int defaultLayer = 0;
+
+
+    private bool ignoreRaycast = false;
     public bool IgnoreRaycast
     {
         get => gameObject.layer == 2 && circle.layer == 2;
         set
         {
-            InitCircle();
-            gameObject.layer = value ? 2 : defaultLayer;
-            circle.layer = value ? 2 : defaultLayer;
+            ignoreRaycast = value;
+            if (circle != null)
+            {
+                gameObject.layer = ignoreRaycast ? 2 : defaultLayer;
+                circle.layer = ignoreRaycast ? 2 : defaultLayer;
+            }
         }
     }
 
@@ -35,7 +40,6 @@ public class Bubble : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        ShootSpeed = 10;
         Id = Random.Range(1, 10000000);
         InitCircle();
     }
@@ -46,25 +50,49 @@ public class Bubble : MonoBehaviour
             return;
         circle = Instantiate(CirclePrefabs[Globals.NumberIndexDic[Number]], transform.position, Quaternion.identity, transform);
         defaultLayer = gameObject.layer;
+        gameObject.layer = ignoreRaycast ? 2 : defaultLayer;
+        circle.layer = ignoreRaycast ? 2 : defaultLayer;
     }
 
-    private List<Vector2> shootDestinations = new List<Vector2>();
-    public void Shoot(List<Vector2> shootDestinations)
+
+    private List<Vector3> targetPositions = new List<Vector3>();
+    private float moveSpeed = 0;
+    public void MoveTo(List<Vector3> targetPositions, float speed)
     {
-        this.shootDestinations = shootDestinations;
+        this.targetPositions = targetPositions;
+        moveSpeed = speed;
     }
+
+    private List<Vector2> targetScales = new List<Vector2>();
+    private float scaleSpeed = 0;
+    public void ScaleTo(List<Vector2> targetScales, float speed)
+    {
+        this.targetScales = targetScales;
+        scaleSpeed = speed;
+    }
+
 
     // Update is called once per frame
     void Update()
     {
-        if (shootDestinations.Count > 0)
+        if (targetScales.Count > 0)
         {
-            transform.position = Vector3.MoveTowards(transform.position, shootDestinations[0], ShootSpeed * Time.deltaTime);
-            if (Vector3.Distance(transform.position, shootDestinations[0]) < 0.001f)
+            transform.localScale = Vector3.MoveTowards(transform.localScale, targetScales[0], scaleSpeed * Time.deltaTime);
+            if (Vector3.Distance(transform.localScale, targetScales[0]) < 0.001f)
             {
-                shootDestinations.RemoveAt(0);
-                if(shootDestinations.Count == 0)
-                    Arrived?.Invoke();
+                targetScales.RemoveAt(0);
+                if (targetScales.Count == 0)
+                    Arrived?.Invoke(this);
+            }
+        }
+        if (targetPositions.Count > 0)
+        {
+            transform.position = Vector3.MoveTowards(transform.position, targetPositions[0], moveSpeed * Time.deltaTime);
+            if (Vector3.Distance(transform.position, targetPositions[0]) < 0.001f)
+            {
+                targetPositions.RemoveAt(0);
+                if(targetPositions.Count == 0)
+                    Arrived?.Invoke(this);
             }
         }
     }

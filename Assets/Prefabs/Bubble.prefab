@@ -96,7 +96,6 @@ MonoBehaviour:
   - {fileID: 2556740039254525043, guid: 2dc5201f4fe17694c8d530bd926183ad, type: 3}
   - {fileID: 523827288116434937, guid: 8122f2580d8c014498dabc8b7e8f299d, type: 3}
   Number: 0
-  ShootSpeed: 4
 --- !u!96 &-6326960740058794326
 TrailRenderer:
   serializedVersion: 2
@@ -136,8 +135,8 @@ TrailRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 40
-  m_Time: 0.3
+  m_SortingOrder: 39
+  m_Time: 0.09
   m_Parameters:
     serializedVersion: 3
     widthMultiplier: 0.5
