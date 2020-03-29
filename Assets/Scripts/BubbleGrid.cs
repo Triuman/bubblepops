@@ -23,6 +23,7 @@ public class BubbleGrid : MonoBehaviour
     Vector2 _emptyCircleGridPos = new Vector2(-1, -1);
     private bool isMouseDown = false;
     Vector2? touchPositionWorld = null;
+    Vector3 holderTargetPos;
 
     private Bubble shooterCurrentBubble;
     List<Bubble> waitingQueue = new List<Bubble>();
@@ -35,8 +36,7 @@ public class BubbleGrid : MonoBehaviour
         PuttingBubbleToShooter = 1,
         AddingNewLine = 2,
         Shooting = 4,
-        Disturbing = 8,
-        Merging = 16
+        Merging = 8
     }
 
     //Using binary state to keep more than one state at a time.
@@ -70,7 +70,7 @@ public class BubbleGrid : MonoBehaviour
         shooterPos = new Vector2(0, GameAreaRectTransform.position.y - GameAreaRectTransform.rect.size.y * GameAreaRectTransform.parent.localScale.y / 2f);
         bubbleSize = BubblePrefab.GetComponent<CircleCollider2D>().radius * 2f;
         bubbleVerticalDistance = bubbleSize / 2 * 1.73205080757f; //r * sqrt(3)
-        //Holder.transform.localPosition = new Vector3(-bubbleSize * (BubblePerLine - 1) / 2f, Holder.transform.localPosition.y, 0);
+        holderTargetPos = Holder.transform.localPosition;
         InitGrid();
         AddNewBubbleToWaitingQueue(GetRandomNumber());
         AddNewBubbleToWaitingQueue(GetRandomNumber());
@@ -129,13 +129,24 @@ public class BubbleGrid : MonoBehaviour
             else
                 RaycastAimLine();
         }
+        else
+        {
+            if (IsInAnimationState(EnumAnimationStates.AddingNewLine))
+            {
+                Holder.transform.localPosition = Vector3.MoveTowards(Holder.transform.localPosition, holderTargetPos, 5 * Time.deltaTime);
+                if (Vector3.Distance(Holder.transform.localPosition, holderTargetPos) < 0.001f)
+                {
+                    RemoveAnimationState(EnumAnimationStates.AddingNewLine);
+                }
+            }
+        }
     }
 
     void InitGrid()
     {
-        AddNewLine();
-        AddNewLine();
-        AddNewLine();
+        AddNewLine(false);
+        AddNewLine(false);
+        AddNewLine(false);
         AddNewLine();
     }
 
@@ -257,6 +268,7 @@ public class BubbleGrid : MonoBehaviour
         PutNextBubbleToShooter();
         DisturbOthers(_emptyCircleGridPos);
         RemoveAnimationState(EnumAnimationStates.Shooting);
+        //AddNewLine();
     }
 
     void DisturbOthers(Vector2 gridPos)
@@ -276,7 +288,7 @@ public class BubbleGrid : MonoBehaviour
         for (int i = 0; i < 6; i++)
         {
             var bubblePos = gridPos + surroundingGridPosDiffs[i];
-            if (bubblePos[1] > -1 && bubblePos[1] < 6 && grid.Count > bubblePos[0] && grid[(int)bubblePos[0]][(int)bubblePos[1]] != null)
+            if (bubblePos[1] > -1 && bubblePos[1] < 6 && bubblePos[0] > -1 && grid.Count > bubblePos[0] && grid[(int)bubblePos[0]][(int)bubblePos[1]] != null)
             {
                 var bubble = grid[(int)bubblePos[0]][(int)bubblePos[1]];
                 var angle = 2 * Math.PI / 6 * i + Math.PI; //As we start from left, we add some more radian to rotate it.
@@ -396,7 +408,7 @@ public class BubbleGrid : MonoBehaviour
         //TODO: Check effect of this bubble
     }
 
-    void AddNewLine()
+    void AddNewLine(bool animate = true)
     {
         var newLine = new Bubble[BubblePerLine];
         isFirstRight = !isFirstRight;
@@ -408,7 +420,14 @@ public class BubbleGrid : MonoBehaviour
         }
 
         grid.Insert(0, newLine);
-        Holder.transform.localPosition = new Vector3(Holder.transform.localPosition.x, Holder.transform.localPosition.y - bubbleVerticalDistance, Holder.transform.localPosition.z);
+        if (!animate)
+            Holder.transform.localPosition = new Vector3(Holder.transform.localPosition.x, Holder.transform.localPosition.y - bubbleVerticalDistance, Holder.transform.localPosition.z);
+        else
+        {
+            holderTargetPos = new Vector3(Holder.transform.localPosition.x, Holder.transform.localPosition.y - bubbleVerticalDistance, Holder.transform.localPosition.z);
+            AddAnimationState(EnumAnimationStates.AddingNewLine);
+        }
+
     }
 
 
