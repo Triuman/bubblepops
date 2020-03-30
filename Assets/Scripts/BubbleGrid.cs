@@ -31,6 +31,7 @@ public class BubbleGrid : MonoBehaviour
 
     readonly Random random = new Random();
 
+
     enum EnumAnimationStates
     {
         NoAnimation = 0,
@@ -133,7 +134,7 @@ public class BubbleGrid : MonoBehaviour
                 var shootDestinations = new List<Vector3>();
                 if (AimLineRenderer.positionCount > 2)
                     shootDestinations.Add(GlobalPositionToScaledHolderPosition(AimLineRenderer.GetPosition(1) - Holder.transform.position));
-                shootDestinations.Add(GlobalPositionToScaledHolderPosition(new Vector3(_emptyCircleGridPos[1] * bubbleSize + GetLineIndent((int)_emptyCircleGridPos[0]), transform.position.y - (_emptyCircleGridPos[0] + 1) * bubbleVerticalDistance - Holder.transform.position.y, BubblePrefab.transform.position.z)));
+                shootDestinations.Add(GlobalPositionToScaledHolderPosition(new Vector3(_emptyCircleGridPos[1] * bubbleSize + GetLineIndent(_emptyCircleGridPos[0]), transform.position.y - (_emptyCircleGridPos[0] + 1) * bubbleVerticalDistance - Holder.transform.position.y, BubblePrefab.transform.position.z)));
                 ShootTheBubble(shootDestinations);
             }
             else
@@ -173,6 +174,8 @@ public class BubbleGrid : MonoBehaviour
 
     void InitGrid()
     {
+        AddNewLine(false);
+        AddNewLine(false);
         AddNewLine(false);
         AddNewLine(false);
     }
@@ -278,9 +281,9 @@ public class BubbleGrid : MonoBehaviour
     {
         if (_emptyCircleGridPos[0] > -1 && _emptyCircleGridPos[1] > -1)
         {
-            if ((int)_emptyCircleGridPos[0] == grid.Count)
+            if (_emptyCircleGridPos[0] == grid.Count)
                 grid.Add(new Bubble[6]);
-            grid[(int)_emptyCircleGridPos[0]][(int)_emptyCircleGridPos[1]] = shooterCurrentBubble;
+            grid[_emptyCircleGridPos[0]][_emptyCircleGridPos[1]] = shooterCurrentBubble;
             shooterCurrentBubble.IgnoreRaycast = false;
             shooterCurrentBubble.MoveTo(shootDestinations, 5);
             shooterCurrentBubble.Arrived += OnShootedBubbleArrived;
@@ -302,7 +305,7 @@ public class BubbleGrid : MonoBehaviour
     void DisturbOthers(Vector2Int gridPos)
     {
         //As this is not a blocking animation, we don't set animation state.
-        bool isRight = isFirstRight ? (int)gridPos[0] % 2 == 0 : (int)gridPos[0] % 2 == 1;
+        bool isRight = IsLineRight(isFirstRight, gridPos[0]);
         Vector2Int[] surroundingGridPosDiffs = new[]
         {
             new Vector2Int(0, -1), //left
@@ -316,9 +319,9 @@ public class BubbleGrid : MonoBehaviour
         for (int i = 0; i < 6; i++)
         {
             var bubblePos = gridPos + surroundingGridPosDiffs[i];
-            if (bubblePos[1] > -1 && bubblePos[1] < 6 && bubblePos[0] > -1 && grid.Count > bubblePos[0] && grid[(int)bubblePos[0]][(int)bubblePos[1]] != null)
+            if (bubblePos[1] > -1 && bubblePos[1] < 6 && bubblePos[0] > -1 && grid.Count > bubblePos[0] && grid[bubblePos[0]][bubblePos[1]] != null)
             {
-                var bubble = grid[(int)bubblePos[0]][(int)bubblePos[1]];
+                var bubble = grid[bubblePos[0]][bubblePos[1]];
                 var angle = 2 * Math.PI / 6 * i + Math.PI; //As we start from left, we add some more radian to rotate it.
                 Vector3 direction = new Vector3((float)Math.Cos(angle), -(float)Math.Sin(angle));
                 bubble.MoveTo(new List<Vector3>()
@@ -357,15 +360,15 @@ public class BubbleGrid : MonoBehaviour
         Vector2Int emptyCircleGridPos = new Vector2Int();
         var hitDir = bubbleHit2D.point - (Vector2)bubbleHit2D.transform.position;
         var hitAngle = Math.Atan2(hitDir.y, hitDir.x);
-        bool isHitLineRight = isFirstRight ? (int)hitBubbleGridPos[0] % 2 == 0 : (int)hitBubbleGridPos[0] % 2 == 1;
+        bool isHitLineRight = IsLineRight(isFirstRight, hitBubbleGridPos[0]);
         if (hitAngle <= -Math.PI / 2) //left bottom
         {
             emptyCircleGridPos = hitBubbleGridPos + new Vector2Int(1, -1 + (isHitLineRight ? 1 : 0));
-            if (grid.Count > (int)emptyCircleGridPos[0] && grid[(int)emptyCircleGridPos[0]][(int)emptyCircleGridPos[1]] != null)
+            if (grid.Count > emptyCircleGridPos[0] && grid[emptyCircleGridPos[0]][emptyCircleGridPos[1]] != null)
             {
                 if (hitAngle <= -Math.PI / 2 - Math.PI / 4) //left
                 {
-                    emptyCircleGridPos[0] = (int)hitBubbleGridPos[0];
+                    emptyCircleGridPos[0] = hitBubbleGridPos[0];
                     emptyCircleGridPos[1] = hitBubbleGridPos[1] - 1;
                 }
                 else //right bottom
@@ -377,12 +380,12 @@ public class BubbleGrid : MonoBehaviour
         else if (hitAngle > -Math.PI / 2 && hitAngle < 0) //right bottom
         {
             emptyCircleGridPos = hitBubbleGridPos + new Vector2Int(1, 1 + (isHitLineRight ? 0 : -1));
-            if (grid.Count > (int)emptyCircleGridPos[0] && grid[(int)emptyCircleGridPos[0]][(int)emptyCircleGridPos[1]] != null)
+            if (grid.Count > emptyCircleGridPos[0] && grid[emptyCircleGridPos[0]][emptyCircleGridPos[1]] != null)
             {
 
                 if (hitAngle >= -Math.PI / 4) //right
                 {
-                    emptyCircleGridPos[0] = (int)hitBubbleGridPos[0];
+                    emptyCircleGridPos[0] = hitBubbleGridPos[0];
                     emptyCircleGridPos[1] = hitBubbleGridPos[1] + 1;
                 }
                 else //left bottom
@@ -404,20 +407,20 @@ public class BubbleGrid : MonoBehaviour
 
     void PlaceEmptyCircle(Vector2Int newGridPos)
     {
-        if (grid.Count > (int)newGridPos[0])
+        if (grid.Count > newGridPos[0])
         {
-            if (grid[(int)newGridPos[0]][(int)newGridPos[1]] != null)
+            if (grid[newGridPos[0]][newGridPos[1]] != null)
             {
                 Debug.LogError("Same place!");
                 return;
             }
         }
 
-        EmptyCircle.transform.position = new Vector3(Holder.transform.position.x + newGridPos[1] * bubbleSize + GetLineIndent((int)newGridPos[0]), transform.position.y - (newGridPos[0] + 1) * bubbleVerticalDistance, 0);
+        EmptyCircle.transform.position = new Vector3(Holder.transform.position.x + newGridPos[1] * bubbleSize + GetLineIndent(newGridPos[0]), transform.position.y - (newGridPos[0] + 1) * bubbleVerticalDistance, 0);
 
         EmptyCircle.gameObject.SetActive(true);
-        if ((int)_emptyCircleGridPos[0] != (int)newGridPos[0] ||
-            (int)_emptyCircleGridPos[1] != (int)newGridPos[1])
+        if (_emptyCircleGridPos[0] != newGridPos[0] ||
+            _emptyCircleGridPos[1] != newGridPos[1])
         {
             EmptyCircle.GetComponent<SpriteRenderer>().color = Globals.NumberColorDic[shooterCurrentBubble.Number];
             EmptyCircle.GetComponent<Animator>().Play("EmptyCircleGrow", 0, 0);
@@ -471,22 +474,23 @@ public class BubbleGrid : MonoBehaviour
         LeftDown
     }
 
-    static Bubble GetBubble(List<Bubble[]> virtualGrid, int lineIndex, int columnIndex)
+    static bool IsBubbleGridPositionValid(List<Bubble[]> grid, Vector2Int bubblePos)
     {
-        if (virtualGrid.Count <= lineIndex || lineIndex < 0 || columnIndex < 0 || columnIndex >= 6)
-            return null;
-        return virtualGrid[lineIndex][columnIndex];
+        return !(grid.Count <= bubblePos[0] || bubblePos[0] < 0 || bubblePos[1] < 0 || bubblePos[1] >= 6);
     }
-    static Bubble GetBubble(List<Bubble[]> virtualGrid, Vector2Int bubblePos)
+
+    static Bubble GetBubble(List<Bubble[]> grid, Vector2Int bubblePos)
     {
-        return GetBubble(virtualGrid, bubblePos[0], bubblePos[1]);
+        if (IsBubbleGridPositionValid(grid, bubblePos))
+            return grid[bubblePos[0]][bubblePos[1]];
+        return null;
     }
 
 
     static void GetConnectedBubblesWithSameNumber(List<Bubble[]> virtualGrid, bool isFirstRight, Vector2Int bubbleGridPos, int number, EnumDirections ignoredDirection, BubbleConnection parentConnection)
     {
         //find if to right or left
-        bool isRight = isFirstRight ? bubbleGridPos[0] % 2 == 0 : bubbleGridPos[0] % 2 == 1;
+        bool isRight = IsLineRight(isFirstRight, bubbleGridPos[0]);
 
         //calculate touching bubble indices starting from left up
         //iterate over them
@@ -682,6 +686,10 @@ public class BubbleGrid : MonoBehaviour
         if (!nextPath.Any())
         {
             RemoveAnimationState(EnumAnimationStates.Merging);
+            if (grid.Count < 4 || grid.Sum(l => l.Count(b => b != null)) < 18 && grid.Count < 8)
+            {
+                AddNewLine();
+            }
             return;
         }
         toBeArrivedCount = 0;
@@ -716,14 +724,10 @@ public class BubbleGrid : MonoBehaviour
             GridPosition = nextConnection.GridPosition,
             Connections = new List<BubbleConnection>()
         };
+        Debug.LogWarning(newConnection.Number);
         nextConnection.Connections.Add(newConnection);
 
         nextPath.RemoveAt(0);
-        if (nextPath.Count == 0)
-        {
-            return;
-        }
-
     }
 
     private int toBeArrivedCount;
@@ -735,8 +739,47 @@ public class BubbleGrid : MonoBehaviour
         {
             var newConnection = nextConnection.Connections[nextConnection.Connections.Count - 1];
             AddNewBubble(newConnection.GridPosition[0], newConnection.GridPosition[1], newConnection.Number);
+            if (newConnection.Number == 2048)
+            {
+                PopAllBubblesAround(newConnection.GridPosition);
+            }
             ApplyMergePath();
         }
+    }
+
+    static void PopAndRemoveBubble(List<Bubble[]> grid, Vector2Int bubblePos, float delay = 0)
+    {
+        var bubble = GetBubble(grid, bubblePos);
+        if (bubble != null)
+        {
+            bubble.Pop(delay);
+            grid[bubblePos[0]][bubblePos[1]] = null;
+        }
+    }
+
+    private void PopAllBubblesAround(Vector2Int _2048GridPos)
+    {
+        var isLineRight = IsLineRight(isFirstRight, _2048GridPos[0]);
+        var leftGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.Left, isLineRight);
+        PopAndRemoveBubble(grid, leftGridPos, 0.05f);
+
+        var leftUpGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.LeftUp, isLineRight);
+        PopAndRemoveBubble(grid, leftUpGridPos, 0.1f);
+
+        var rightUpGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.RightUp, isLineRight);
+        PopAndRemoveBubble(grid, rightUpGridPos, 0.15f);
+
+        var rightGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.Right, isLineRight);
+        PopAndRemoveBubble(grid, rightGridPos, 0.2f);
+
+        var rightDownGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.RightDown, isLineRight);
+        PopAndRemoveBubble(grid, rightDownGridPos, 0.25f);
+
+        var leftDownGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.LeftDown, isLineRight);
+        PopAndRemoveBubble(grid, leftDownGridPos, 0.3f);
+
+        PopAndRemoveBubble(grid, _2048GridPos, 0.35f);
+
     }
 
     static List<List<int>> GetDepthList(BubbleConnection connection)
@@ -778,17 +821,19 @@ public class BubbleGrid : MonoBehaviour
 
     static int GetMergeResultNumber(int number, int count)
     {
-        return (int)Math.Pow(2, Globals.NumberIndexDic[number] + count);
+        count += Globals.NumberIndexDic[number];
+        if (count >= 11)
+            return 2048;
+        if (count <= 1)
+            return 2;
+        return (int)Math.Pow(2, count);
     }
 
     class BubbleConnection
     {
         public int Number { get; set; }
 
-        public int NextNumber
-        {
-            get { return GetMergeResultNumber(Number, ParentConnection.Connections.Count + 1); }
-        }
+        public int NextNumber => GetMergeResultNumber(Number, ParentConnection.Connections.Count + 1);
 
         public BubbleConnection ParentConnection { get; set; }
         public Vector2Int GridPosition { get; set; }
@@ -799,13 +844,45 @@ public class BubbleGrid : MonoBehaviour
     {
         return (int)Math.Pow(2, random.Next(1, 9));
     }
-    bool IsLineRight(int lineIndex)
+    static bool IsLineRight(bool isFirstRight, int lineIndex)
     {
         return isFirstRight ? lineIndex % 2 == 0 : lineIndex % 2 == 1;
     }
     float GetLineIndent(int lineIndex)
     {
-        return bubbleSize / 2 * (IsLineRight(lineIndex) ? 1 : 0);
+        return bubbleSize / 2 * (IsLineRight(isFirstRight, lineIndex) ? 1 : 0);
+    }
+
+    static Vector2Int GetGridPositionByDirection(Vector2Int referenceGridPos, EnumDirections direction, bool isLineRight)
+    {
+        Vector2Int diff;
+
+        switch (direction)
+        {
+            case EnumDirections.Left:
+                diff = new Vector2Int(0, -1);
+                break;
+            case EnumDirections.LeftUp:
+                diff = new Vector2Int(-1, isLineRight ? 0 : -1);
+                break;
+            case EnumDirections.RightUp:
+                diff = new Vector2Int(-1, isLineRight ? 1 : 0);
+                break;
+            case EnumDirections.Right:
+                diff = new Vector2Int(0, 1);
+                break;
+            case EnumDirections.RightDown:
+                diff = new Vector2Int(1, isLineRight ? 1 : 0);
+                break;
+            case EnumDirections.LeftDown:
+                diff = new Vector2Int(1, isLineRight ? 0 : -1);
+                break;
+            default:
+                diff = new Vector2Int();
+                break;
+        }
+
+        return referenceGridPos + diff;
     }
 
 }
