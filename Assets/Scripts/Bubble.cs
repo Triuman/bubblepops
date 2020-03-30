@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -10,6 +11,7 @@ using Random = UnityEngine.Random;
 public class Bubble : MonoBehaviour
 {
     public List<GameObject> CirclePrefabs;
+    public GameObject PopEffectPrefab;
 
     public event Action<Bubble> Arrived;
 
@@ -59,7 +61,7 @@ public class Bubble : MonoBehaviour
     private float moveSpeed = 0;
     public void MoveTo(List<Vector3> targetPositions, float speed)
     {
-        this.targetPositions = targetPositions;
+        this.targetPositions = targetPositions.ToList();
         moveSpeed = speed;
     }
 
@@ -67,12 +69,15 @@ public class Bubble : MonoBehaviour
     private float scaleSpeed = 0;
     public void ScaleTo(List<Vector2> targetScales, float speed)
     {
-        this.targetScales = targetScales;
+        this.targetScales = targetScales.ToList();
         scaleSpeed = speed;
     }
 
     public void Pop()
     {
+        ParticleSystem.MainModule settings = PopEffectPrefab.GetComponent<ParticleSystem>().main;
+        settings.startColor = new Color(Globals.NumberColorDic[Number].r, Globals.NumberColorDic[Number].g, Globals.NumberColorDic[Number].b, 1);
+        Instantiate(PopEffectPrefab, transform.parent.transform.parent.transform.parent, true).transform.position = transform.position;
         Destroy(gameObject);
     }
 
@@ -81,7 +86,7 @@ public class Bubble : MonoBehaviour
     {
         if (targetScales.Count > 0)
         {
-            transform.localScale = Vector3.MoveTowards(transform.localScale, targetScales[0], scaleSpeed * Time.deltaTime);
+            transform.localScale = Vector3.MoveTowards(transform.localScale, targetScales[0], scaleSpeed * Time.deltaTime * Globals.AnimationSpeedScale);
             if (Vector3.Distance(transform.localScale, targetScales[0]) < 0.001f)
             {
                 targetScales.RemoveAt(0);
@@ -91,7 +96,7 @@ public class Bubble : MonoBehaviour
         }
         if (targetPositions.Count > 0)
         {
-            transform.localPosition = Vector3.MoveTowards(transform.localPosition, targetPositions[0], moveSpeed * Time.deltaTime);
+            transform.localPosition = Vector3.MoveTowards(transform.localPosition, targetPositions[0], moveSpeed * Time.deltaTime * Globals.AnimationSpeedScale);
             if (Vector3.Distance(transform.localPosition, targetPositions[0]) < 0.001f)
             {
                 targetPositions.RemoveAt(0);

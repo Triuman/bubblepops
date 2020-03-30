@@ -58,7 +58,7 @@ Rigidbody2D:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6545680961313183314}
-  m_BodyType: 1
+  m_BodyType: 2
   m_Simulated: 1
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0
@@ -95,6 +95,8 @@ MonoBehaviour:
   - {fileID: 5083449750974249130, guid: 0bd133fbb7ee039489a310fd130bc44a, type: 3}
   - {fileID: 2556740039254525043, guid: 2dc5201f4fe17694c8d530bd926183ad, type: 3}
   - {fileID: 523827288116434937, guid: 8122f2580d8c014498dabc8b7e8f299d, type: 3}
+  PopEffectPrefab: {fileID: 6700684850155664897, guid: 2f294090421ba8f468f552f77e26fe7a,
+    type: 3}
   Number: 0
 --- !u!96 &-6326960740058794326
 TrailRenderer:

@@ -37,7 +37,8 @@ public class BubbleGrid : MonoBehaviour
         PuttingBubbleToShooter = 1,
         AddingNewLine = 2,
         Shooting = 4,
-        Merging = 8
+        WaitingToMerge = 8,
+        Merging = 16
     }
 
     //Using binary state to keep more than one state at a time.
@@ -98,7 +99,7 @@ public class BubbleGrid : MonoBehaviour
         waitingQueue.RemoveAt(0);
         shooterCurrentBubble.transform.position = new Vector3(shooterCurrentBubble.transform.position.x, shooterCurrentBubble.transform.position.y, BubblePrefab.transform.localPosition.z);
         shooterCurrentBubble.ScaleTo(new List<Vector2>() { shooterCurrentBubble.transform.localScale / 0.7f }, 0.6f);
-        shooterCurrentBubble.MoveTo(new List<Vector3>() { GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position) }, 4);
+        shooterCurrentBubble.MoveTo(new List<Vector3>() { GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position) }, 1);
         AddAnimationState(EnumAnimationStates.PuttingBubbleToShooter);
         shooterCurrentBubble.Arrived += OnBubbleArrivedToShooter;
     }
@@ -154,6 +155,17 @@ public class BubbleGrid : MonoBehaviour
                 if (Vector3.Distance(Holder.transform.localPosition, holderTargetPos) < 0.001f)
                 {
                     RemoveAnimationState(EnumAnimationStates.AddingNewLine);
+                }
+            }
+
+            if (IsInAnimationState(EnumAnimationStates.WaitingToMerge))
+            {
+                startMergeIn -= Time.deltaTime;
+                if (startMergeIn <= 0)
+                {
+                    RemoveAnimationState(EnumAnimationStates.WaitingToMerge);
+                    AddAnimationState(EnumAnimationStates.Merging);
+                    ApplyMergePath();
                 }
             }
         }
@@ -270,7 +282,7 @@ public class BubbleGrid : MonoBehaviour
                 grid.Add(new Bubble[6]);
             grid[(int)_emptyCircleGridPos[0]][(int)_emptyCircleGridPos[1]] = shooterCurrentBubble;
             shooterCurrentBubble.IgnoreRaycast = false;
-            shooterCurrentBubble.MoveTo(shootDestinations, 20);
+            shooterCurrentBubble.MoveTo(shootDestinations, 5);
             shooterCurrentBubble.Arrived += OnShootedBubbleArrived;
             AddAnimationState(EnumAnimationStates.Shooting);
         }
@@ -300,7 +312,7 @@ public class BubbleGrid : MonoBehaviour
             new Vector2Int(1, isRight ? 1 : 0), //right down
             new Vector2Int(1, isRight ? 0 : -1) //left down
         };
-        float distance = 0.1f;
+        float distance = 0.02f;
         for (int i = 0; i < 6; i++)
         {
             var bubblePos = gridPos + surroundingGridPosDiffs[i];
@@ -313,7 +325,7 @@ public class BubbleGrid : MonoBehaviour
                 {
                     bubble.transform.localPosition + direction * distance,
                     bubble.transform.localPosition,
-                }, 1);
+                }, 0.2f);
             }
         }
     }
@@ -327,7 +339,7 @@ public class BubbleGrid : MonoBehaviour
     Vector2Int GetGridPosFromBubbleHit(RaycastHit2D bubbleHit2D)
     {
         //Put empty circle
-        var hitBubble = bubbleHit2D.transform.parent.GetComponent<Bubble>();
+        var hitBubble = bubbleHit2D.transform.GetComponent<Bubble>();
         Vector2Int hitBubbleGridPos = new Vector2Int(-1, -1);
         for (int l = 0; l < grid.Count; l++)
         {
@@ -421,7 +433,6 @@ public class BubbleGrid : MonoBehaviour
         grid[lineIndex][columnIndex] = Instantiate(BubblePrefab, Holder.transform, true).GetComponent<Bubble>();
         grid[lineIndex][columnIndex].transform.position = new Vector3(Holder.transform.position.x + columnIndex * bubbleSize + GetLineIndent(lineIndex), transform.position.y - (lineIndex + 1) * bubbleVerticalDistance, 0);
         grid[lineIndex][columnIndex].Number = number;
-        //TODO: Check effect of this bubble
     }
 
     void AddNewLine(bool animate = true)
@@ -596,8 +607,6 @@ public class BubbleGrid : MonoBehaviour
 
     }
 
-    //if 1, we will choose the deepest path. if 0, we will choose the shortest.
-    private float deepScale = 1;
 
     void CalculateAndAnimatePops(Vector2Int bubbleGridPos)
     {
@@ -635,10 +644,11 @@ public class BubbleGrid : MonoBehaviour
             return;
 
         //Find desired depth path
+        //TODO: Eliminate ones that merge outside
         depthList = depthList.OrderBy(d => d.Count).ToList();
         var minDepth = depthList.Min(d => d.Count);
         var maxDepth = depthList.Max(d => d.Count);
-        var wantedDepth = Mathf.Lerp(minDepth, maxDepth, deepScale);
+        var wantedDepth = Mathf.Lerp(minDepth, maxDepth, Globals.DepthScale);
         float minDiff = Single.MaxValue;
         List<int> selectedPath = null;
         foreach (var depth in depthList)
@@ -657,25 +667,77 @@ public class BubbleGrid : MonoBehaviour
         }
 
         //Animate merging and popping
-        ApplyMergePath(rootConnection, selectedPath);
+        nextConnection = rootConnection;
+        nextPath = selectedPath;
 
+        startMergeIn = Globals.WaitSecondsBeforeMerge;
+        AddAnimationState(EnumAnimationStates.WaitingToMerge);
     }
 
-
-    void ApplyMergePath(BubbleConnection connection, List<int> path)
+    private float startMergeIn = 0.5f; //seconds
+    private BubbleConnection nextConnection = null;
+    private List<int> nextPath = null;
+    void ApplyMergePath()
     {
-        if (!connection.Connections.Any())
+        if (!nextPath.Any())
+        {
+            RemoveAnimationState(EnumAnimationStates.Merging);
             return;
+        }
+        toBeArrivedCount = 0;
+        var connection = this.nextConnection;
+        if (!connection.Connections.Any())
+        {
+            Debug.LogError("There must be more connections! Something is wrong.");
+            return;
+        }
+        if (connection.Connections.Count <= nextPath[0] || nextPath[0] < 0)
+        {
+            Debug.LogError("Connection count is " + connection.Connections.Count + " while index in the path is " + nextPath[0]);
+            return;
+        }
+        nextConnection = connection.Connections[nextPath[0]];
+        var targetPosition = new List<Vector3>()
+        {
+            grid[nextConnection.GridPosition[0]][nextConnection.GridPosition[1]].transform.localPosition
+        };
         foreach (var childConnection in connection.Connections)
         {
-            grid[childConnection.GridPosition[0]][childConnection.GridPosition[1]].Pop();
+            var bubble = grid[childConnection.GridPosition[0]][childConnection.GridPosition[1]];
+            grid[childConnection.GridPosition[0]][childConnection.GridPosition[1]] = null;
+            bubble.MoveTo(targetPosition, 1f);
+            bubble.Arrived += OnBubbleArriveMergePoint;
+            toBeArrivedCount++;
         }
 
-        var nextConnection = connection.Connections[path[0]];
-        path.RemoveAt(0);
-        ApplyMergePath(nextConnection, path);
+        var newConnection = new BubbleConnection()
+        {
+            Number = GetMergeResultNumber(nextConnection.Number, connection.Connections.Count),
+            GridPosition = nextConnection.GridPosition,
+            Connections = new List<BubbleConnection>()
+        };
+        nextConnection.Connections.Add(newConnection);
+
+        nextPath.RemoveAt(0);
+        if (nextPath.Count == 0)
+        {
+            return;
+        }
+
     }
-    
+
+    private int toBeArrivedCount;
+    private void OnBubbleArriveMergePoint(Bubble bubble)
+    {
+        bubble.Pop();
+        toBeArrivedCount--;
+        if (toBeArrivedCount <= 0)
+        {
+            var newConnection = nextConnection.Connections[nextConnection.Connections.Count - 1];
+            AddNewBubble(newConnection.GridPosition[0], newConnection.GridPosition[1], newConnection.Number);
+            ApplyMergePath();
+        }
+    }
 
     static List<List<int>> GetDepthList(BubbleConnection connection)
     {
@@ -745,5 +807,5 @@ public class BubbleGrid : MonoBehaviour
     {
         return bubbleSize / 2 * (IsLineRight(lineIndex) ? 1 : 0);
     }
-    
+
 }

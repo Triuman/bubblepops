@@ -4,6 +4,12 @@ using UnityEngine;
 
 public static class Globals
 {
+    //if 1, we will choose the deepest path. if 0, we will choose the shortest.
+    public static float DepthScale = 1;
+    public static float AnimationSpeedScale = 1;
+    public static float WaitSecondsBeforeMerge = 0.2f;
+
+
     public static Dictionary<int, Color> NumberColorDic = new Dictionary<int, Color>()
     {
         { 2, new Color(0.9215686f, 0.3960784f, 0.5568628f,.5f) },
