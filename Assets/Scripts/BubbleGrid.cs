@@ -2,7 +2,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.UI;
 using Random = System.Random;
 
 public class BubbleGrid : MonoBehaviour
@@ -12,6 +14,11 @@ public class BubbleGrid : MonoBehaviour
     public GameObject EmptyCircle;
     public RectTransform GameAreaRectTransform;
     public LineRenderer AimLineRenderer;
+    public Text TxtScore;
+    public Text TxtMultiplier;
+    public Text TxtMultiplierBig;
+    public Animator MultiplierAnimator;
+
 
     private const int BubblePerLine = 6; //If you change this number, you should implement scaling bubbles.
 
@@ -31,6 +38,40 @@ public class BubbleGrid : MonoBehaviour
 
     readonly Random random = new Random();
 
+    private float _score = 0;
+    private float _multiplier = 1;
+
+    private void IncreaseMultiplier()
+    {
+        _multiplier++;
+        TxtMultiplier.text = "x" + _multiplier;
+        TxtMultiplierBig.text = TxtMultiplier.text;
+        MultiplierAnimator.Play("MultiplierTextGrow", 0, 0);
+    }
+    private void ResetMultiplier()
+    {
+        _multiplier = 1;
+        TxtMultiplier.text = "x" + _multiplier;
+        TxtMultiplierBig.text = TxtMultiplier.text;
+    }
+    void AddScore(float value)
+    {
+        _score += value * _multiplier;
+        string scoreText = "";
+        if (_score >= 1000)
+            scoreText = _score / 1000 + "K";
+        else
+            scoreText = _score.ToString();
+        TxtScore.text = scoreText;
+
+        //TODO: show new level value
+        var level = GetLevel(_score);
+        Debug.Log("level -> " + level);
+    }
+    static float GetLevel(float score)
+    {
+        return (float)Math.Sqrt(score) / 20;
+    }
 
     enum EnumAnimationStates
     {
@@ -48,7 +89,7 @@ public class BubbleGrid : MonoBehaviour
 
     bool IsAnimating()
     {
-        return !IsInAnimationStateOnly(0);
+        return !IsInAnimationStateOnly(EnumAnimationStates.NoAnimation);
     }
     bool IsInAnimationStateOnly(EnumAnimationStates state)
     {
@@ -166,6 +207,7 @@ public class BubbleGrid : MonoBehaviour
                 {
                     RemoveAnimationState(EnumAnimationStates.WaitingToMerge);
                     AddAnimationState(EnumAnimationStates.Merging);
+                    ResetMultiplier();
                     ApplyMergePath();
                 }
             }
@@ -717,6 +759,7 @@ public class BubbleGrid : MonoBehaviour
             bubble.Arrived += OnBubbleArriveMergePoint;
             toBeArrivedCount++;
         }
+        AddScore(connection.Number * 10);
 
         var newConnection = new BubbleConnection()
         {
@@ -728,6 +771,8 @@ public class BubbleGrid : MonoBehaviour
         nextConnection.Connections.Add(newConnection);
 
         nextPath.RemoveAt(0);
+        if(nextPath.Any())
+            IncreaseMultiplier();
     }
 
     private int toBeArrivedCount;
@@ -741,6 +786,7 @@ public class BubbleGrid : MonoBehaviour
             AddNewBubble(newConnection.GridPosition[0], newConnection.GridPosition[1], newConnection.Number);
             if (newConnection.Number == 2048)
             {
+                //TODO: collect points from this
                 PopAllBubblesAround(newConnection.GridPosition);
             }
             ApplyMergePath();
