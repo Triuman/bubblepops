@@ -71,6 +71,10 @@ public class Bubble : MonoBehaviour
         scaleSpeed = speed;
     }
 
+    public void Pop()
+    {
+        Destroy(gameObject);
+    }
 
     // Update is called once per frame
     void Update()
