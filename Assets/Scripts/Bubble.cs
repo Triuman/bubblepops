@@ -50,7 +50,6 @@ public class Bubble : MonoBehaviour
     {
         if (circle != null)
             return;
-        Debug.Log(Number);
         circle = Instantiate(CirclePrefabs[Globals.NumberIndexDic[Number]], transform.position, Quaternion.identity, transform);
         defaultLayer = gameObject.layer;
         gameObject.layer = ignoreRaycast ? 2 : defaultLayer;
