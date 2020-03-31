@@ -476,11 +476,13 @@ public class BubbleGrid : MonoBehaviour
 
     void AddNewBubble(int lineIndex, int columnIndex, int number)
     {
+        //add new line if needed
         if (lineIndex == grid.Count)
             grid.Add(new Bubble[BubblePerLine]);
-        grid[lineIndex][columnIndex] = Instantiate(BubblePrefab, Holder.transform, true).GetComponent<Bubble>();
-        grid[lineIndex][columnIndex].transform.position = new Vector3(Holder.transform.position.x + columnIndex * bubbleSize + GetLineIndent(lineIndex), transform.position.y - (lineIndex + 1) * bubbleVerticalDistance, 0);
-        grid[lineIndex][columnIndex].Number = number;
+        var newBubble = Instantiate(BubblePrefab, Holder.transform, true).GetComponent<Bubble>();
+        newBubble.transform.position = new Vector3(Holder.transform.position.x + columnIndex * bubbleSize + GetLineIndent(lineIndex), transform.position.y - (lineIndex + 1) * bubbleVerticalDistance, 0);
+        newBubble.Number = number;
+        grid[lineIndex][columnIndex] = newBubble;
     }
 
     void AddNewLine(bool animate = true)
@@ -589,9 +591,9 @@ public class BubbleGrid : MonoBehaviour
         }
     }
 
-    static void FindDeepConnectionsRecursive2(List<int[]> virtualGrid, bool isFirstRight, List<BubbleConnection> sameLevelConnections)
+    static void FindDeepConnectionsRecursive2(List<int[]> virtualGrid, bool isFirstRight, List<Vector2Int> ignoredPositions, List<BubbleConnection> sameLevelConnections)
     {
-        var ignoredPositions = sameLevelConnections.Select(c => c.GridPosition).ToList();
+        ignoredPositions.AddRange(sameLevelConnections.Select(c => c.GridPosition).ToList());
         //As there is a exception on NextNumber for the first level, we call this once manually.
         foreach (var sameLevelConnection in sameLevelConnections)
         {
@@ -613,7 +615,7 @@ public class BubbleGrid : MonoBehaviour
             if (sameLevelConnection.Connections.Count == 1)
                 continue;
             //we send them to be foreach'ed until none of them have same level friends
-            FindDeepConnectionsRecursive2(virtualGrid, isFirstRight, sameLevelConnection.Connections);
+            FindDeepConnectionsRecursive2(virtualGrid, isFirstRight, ignoredPositions, sameLevelConnection.Connections);
         }
     }
 
@@ -633,7 +635,7 @@ public class BubbleGrid : MonoBehaviour
             Connections = new List<BubbleConnection>()
         });
         GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, rootConnection.Connections[0], new List<Vector2Int>(), rootConnection.Connections);
-        FindDeepConnectionsRecursive2(virtualGrid, isFirstRight, rootConnection.Connections);
+        FindDeepConnectionsRecursive2(virtualGrid, isFirstRight, new List<Vector2Int>(), rootConnection.Connections);
 
         //Create depth list
         depthList = GetDepthListRecursive(rootConnection);
@@ -726,13 +728,13 @@ public class BubbleGrid : MonoBehaviour
         }
         AddScore(connection.Number * 10);
 
-        var newConnection = new BubbleConnection()
-        {
-            Number = GetMergeResultNumber(nextConnection.Number, connection.Connections.Count),
-            GridPosition = nextConnection.GridPosition,
-            Connections = new List<BubbleConnection>()
-        };
-        nextConnection.Connections.Add(newConnection);
+        //var newConnection = new BubbleConnection()
+        //{
+        //    Number = GetMergeResultNumber(nextConnection.Number, connection.Connections.Count),
+        //    GridPosition = nextConnection.GridPosition,
+        //    Connections = new List<BubbleConnection>()
+        //};
+        //nextConnection.Connections.Add(newConnection);
 
         nextPath.RemoveAt(0);
         if (nextPath.Any())
@@ -746,7 +748,7 @@ public class BubbleGrid : MonoBehaviour
         toBeArrivedCount--;
         if (toBeArrivedCount <= 0)
         {
-            var newConnection = nextConnection.Connections[nextConnection.Connections.Count - 1];
+            var newConnection = nextConnection.Connections[0];
             AddNewBubble(newConnection.GridPosition[0], newConnection.GridPosition[1], newConnection.Number);
             if (newConnection.Number == 2048)
             {
@@ -819,7 +821,7 @@ public class BubbleGrid : MonoBehaviour
 
         return myList;
     }
-    
+
     static bool IsConnectedToTheTopWallRecursive(List<int[]> virtualGrid, bool isFirstRight, Vector2Int gridPos, List<Vector2Int> visitedPoints)
     {
         visitedPoints.Add(gridPos);
@@ -841,7 +843,7 @@ public class BubbleGrid : MonoBehaviour
             if (!IsBubbleGridPositionValid(virtualGrid, dirGridPos))
                 continue;
             //If there is no bubble on this direction, what are we doing here.
-            if(virtualGrid[dirGridPos[0]][dirGridPos[1]] == 0)
+            if (virtualGrid[dirGridPos[0]][dirGridPos[1]] == 0)
                 continue;
             //If we touch the top wall, go and tell everyone!
             if (dirGridPos[0] == 0)
@@ -870,8 +872,6 @@ public class BubbleGrid : MonoBehaviour
     {
         public bool IsConnectedToTheTopWall { get; set; }
         public int Number { get; set; }
-
-        public int GrandChildNumber => GetMergeResultNumber(Number * 2, Connections.Count);
 
         public Vector2Int GridPosition { get; set; }
         public List<BubbleConnection> Connections { get; set; }
@@ -934,7 +934,7 @@ public class BubbleGrid : MonoBehaviour
         var swarmStartPoint = new Vector2Int(virtualGrid.Count - 1, 0);
         SwarmUntilBubbleRecursive(virtualGrid, isFirstRight, new List<Vector2Int>(), edgePointsDic, swarmStartPoint);
         virtualGrid.RemoveAt(virtualGrid.Count - 1);
-        
+
         return edgePointsDic.Select(e => e.Key).ToList();
     }
 
@@ -1020,8 +1020,8 @@ public class BubbleGrid : MonoBehaviour
         for (var numberIndex = 0; numberIndex < numberMergeDepthArray.Length; numberIndex++)
         {
             var numberVecInt = numberMergeDepthArray[numberIndex];
-            var count = (float) numberVecInt[0] / maxPositionCount;
-            var sum = (float) numberVecInt[1] / maxSum;
+            var count = (float)numberVecInt[0] / maxPositionCount;
+            var sum = (float)numberVecInt[1] / maxSum;
             var score = countRatio * count + sumRatio * sum;
             scoreDic[numberIndex] = score;
         }
