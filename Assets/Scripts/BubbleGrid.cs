@@ -114,7 +114,7 @@ public class BubbleGrid : MonoBehaviour
         bubbleVerticalDistance = bubbleSize / 2 * 1.73205080757f; //r * sqrt(3)
         holderTargetPos = Holder.transform.localPosition;
         InitGrid();
-        AddNewBubbleToWaitingQueue(GetRandomNumber());
+        AddNewBubbleToWaitingQueue(2);
         AddNewBubbleToWaitingQueue(GetRandomNumber());
         PutNextBubbleToShooter();
     }
@@ -132,7 +132,7 @@ public class BubbleGrid : MonoBehaviour
     {
         if (waitingQueue.Count == 0)
         {
-            AddNewBubbleToWaitingQueue(GetRandomNumber());
+            AddNewBubbleToWaitingQueue();
             Debug.LogError("Waiting Queue was empty! Be careful next time.");
         }
         shooterCurrentBubble = waitingQueue[0];
@@ -152,10 +152,15 @@ public class BubbleGrid : MonoBehaviour
 
     void AddNewBubbleToWaitingQueue(int number = -1)
     {
+        Debug.LogError("Adding new to queue!");
+        if (IsInAnimationState(EnumAnimationStates.Merging))
+        {
+            Debug.LogError("We are still merging. This will cause miscalculation. Do it after merging is done.");
+        }
         var newBubble = Instantiate(BubblePrefab, Holder.transform, true).GetComponent<Bubble>();
         newBubble.transform.position = new Vector3(shooterPos.x - bubbleSize, shooterPos.y, waitingQueue.Count + 1);
         newBubble.transform.localScale = newBubble.transform.localScale * 0.7f;
-        newBubble.Number = GetNumberForNextBubbleInTheQueue(GetNewVirtualGrid(grid), isFirstRight);
+        newBubble.Number = number > 0 ? number : GetNumberForNextBubbleInTheQueue(GetNewVirtualGrid(grid), isFirstRight);
         newBubble.IgnoreRaycast = true;
         waitingQueue.Add(newBubble);
     }
@@ -216,9 +221,9 @@ public class BubbleGrid : MonoBehaviour
     void InitGrid()
     {
         AddNewLine(new int[] { 2, 4, 4, 16, 32, 32 }, false);
-        AddNewLine(false);
-        AddNewLine(false);
-        AddNewLine(false);
+        AddNewLine(new int[] { 8, 4, 4, 16, 32, 32 }, false);
+        AddNewLine(new int[] { 2, 4, 4, 16, 32, 32 }, false);
+        AddNewLine(new int[] { 2, 4, 4, 16, 32, 32 }, false);
     }
 
 
@@ -335,8 +340,6 @@ public class BubbleGrid : MonoBehaviour
     private void OnShootedBubbleArrived(Bubble bubble)
     {
         shooterCurrentBubble.Arrived -= OnShootedBubbleArrived;
-        AddNewBubbleToWaitingQueue(GetRandomNumber());
-        PutNextBubbleToShooter();
         DisturbOthers(_emptyCircleGridPos);
         RemoveAnimationState(EnumAnimationStates.Shooting);
         CalculateAndAnimatePops(_emptyCircleGridPos);
@@ -357,6 +360,7 @@ public class BubbleGrid : MonoBehaviour
             new Vector2Int(1, isRight ? 0 : -1) //left down
         };
         float distance = 0.015f;
+        float speed = 0.2f;
         for (int i = 0; i < BubblePerLine; i++)
         {
             var bubblePos = gridPos + surroundingGridPosDiffs[i];
@@ -369,7 +373,7 @@ public class BubbleGrid : MonoBehaviour
                 {
                     bubble.transform.localPosition + direction * distance,
                     bubble.transform.localPosition,
-                }, 0.2f);
+                }, speed);
             }
         }
     }
@@ -542,166 +546,96 @@ public class BubbleGrid : MonoBehaviour
         return null;
     }
 
-
-    static void GetConnectedBubblesWithSameNumberRecursive(List<int[]> virtualGrid, bool isFirstRight, Vector2Int bubbleGridPos, int number, EnumDirections ignoredDirection, BubbleConnection parentConnection)
+    //it does not add itself. the first point should be added before or after calling this.
+    static void GetConnectedBubblesWithSameNumberRecursive(List<int[]> virtualGrid, bool isFirstRight, BubbleConnection bubbleConnection, List<Vector2Int> visitedPoints, List<BubbleConnection> resultBubbleConnectionList)
     {
-        //find if to right or left
-        bool isRight = IsLineRight(isFirstRight, bubbleGridPos[0]);
+        //we dont want to come here again
+        visitedPoints.Add(bubbleConnection.GridPosition);
 
-        //calculate touching bubble indices starting from left up
-        //iterate over them
-        //if you find same number, check that number's area too but only the ones this one is not touching
-        if (ignoredDirection != EnumDirections.LeftUp && ignoredDirection != EnumDirections.Left &&
-            ignoredDirection != EnumDirections.LeftDown)
+        //swarm to all 6 directions
+        var directions = new EnumDirections[]
         {
-            var leftBubblePos = new Vector2Int(bubbleGridPos[0], bubbleGridPos[1] - 1);
-            var bubbleNumber = GetBubbleNumber(virtualGrid, leftBubblePos);
-            if (bubbleNumber == number && !parentConnection.Connections.Any(b => b.GridPosition.Equals(leftBubblePos)))
-            {
-                var newConnection = new BubbleConnection()
-                {
-                    Number = number,
-                    GridPosition = leftBubblePos,
-                    Connections = new List<BubbleConnection>(),
-                    ParentConnection = parentConnection
-                };
-                parentConnection.Connections.Add(newConnection);
-                GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, leftBubblePos, number, EnumDirections.Right, parentConnection);
-            }
-        }
+            EnumDirections.Left,
+            EnumDirections.LeftUp,
+            EnumDirections.RightUp,
+            EnumDirections.Right,
+            EnumDirections.RightDown,
+            EnumDirections.LeftDown
+        };
 
-        if (ignoredDirection != EnumDirections.Left && ignoredDirection != EnumDirections.LeftUp &&
-            ignoredDirection != EnumDirections.RightUp)
+        for (int i = 0; i < directions.Length; i++)
         {
-            var leftUpBubblePos = new Vector2Int(bubbleGridPos[0] - 1, bubbleGridPos[1] + (isRight ? 0 : -1));
-            var bubbleNumber = GetBubbleNumber(virtualGrid, leftUpBubblePos);
-            if (bubbleNumber == number && !parentConnection.Connections.Any(b => b.GridPosition.Equals(leftUpBubblePos)))
+            var dirGridPos = GetGridPositionByDirection(bubbleConnection.GridPosition, directions[i], isFirstRight);
+            if (!IsBubbleGridPositionValid(virtualGrid, dirGridPos))
+                continue;
+            //If there is no bubble on this direction, what are we doing here.
+            if (virtualGrid[dirGridPos[0]][dirGridPos[1]] == 0)
+                continue;
+            //We only look for our numbers
+            if (GetBubbleNumber(virtualGrid, dirGridPos) != bubbleConnection.Number)
+                continue;
+            var isVisited = visitedPoints.Any(v => v[0] == dirGridPos[0] && v[1] == dirGridPos[1]);
+            if (isVisited)
+                continue;
+            //this must be a new candidate. let's add it to our list and continue from it's position.
+            var foundConnection = new BubbleConnection()
             {
-                var newConnection = new BubbleConnection()
-                {
-                    Number = number,
-                    GridPosition = leftUpBubblePos,
-                    Connections = new List<BubbleConnection>(),
-                    ParentConnection = parentConnection
-                };
-                parentConnection.Connections.Add(newConnection);
-                GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, leftUpBubblePos, number, EnumDirections.RightDown, parentConnection);
-            }
+                Number = bubbleConnection.Number,
+                GridPosition = dirGridPos,
+                Connections = new List<BubbleConnection>()
+            };
+            resultBubbleConnectionList.Add(foundConnection);
+            GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, foundConnection, visitedPoints, resultBubbleConnectionList);
         }
+    }
 
-        if (ignoredDirection != EnumDirections.LeftUp && ignoredDirection != EnumDirections.RightUp &&
-            ignoredDirection != EnumDirections.Right)
+    static void FindDeepConnectionsRecursive2(List<int[]> virtualGrid, bool isFirstRight, BubbleConnection connection)
+    {
+        //As there is a exception on NextNumber for the first level, we call this once manually.
+        foreach (var innerConnection in connection.Connections)
         {
-            var rightUpBubblePos = new Vector2Int(bubbleGridPos[0] - 1, bubbleGridPos[1] + (isRight ? 1 : 0));
-            var bubbleNumber = GetBubbleNumber(virtualGrid, rightUpBubblePos);
-            if (bubbleNumber == number && !parentConnection.Connections.Any(b => b.GridPosition.Equals(rightUpBubblePos)))
+            //imagining a merged point here
+            innerConnection.Connections.Add(new BubbleConnection()
             {
-                var newConnection = new BubbleConnection()
-                {
-                    Number = number,
-                    GridPosition = rightUpBubblePos,
-                    Connections = new List<BubbleConnection>(),
-                    ParentConnection = parentConnection
-                };
-                parentConnection.Connections.Add(newConnection);
-                GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, rightUpBubblePos, number, EnumDirections.LeftDown, parentConnection);
-            }
+                Number = GetMergeResultNumber(innerConnection.Number, connection.Connections.Count),
+                GridPosition = innerConnection.GridPosition,
+                Connections = new List<BubbleConnection>()
+            });
+            GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, innerConnection.Connections[0], new List<Vector2Int>(), innerConnection.Connections);
+            //as we found the same numbered connected bubbles and now we can check if this bubble is connected to wall by means of other bubbles
+            //we ignore these bubbles because we will merge them into this one.
+            var ignoredPositions = connection.Connections.Select(c => c.GridPosition).ToList();
+            innerConnection.IsConnectedToTheTopWall = IsConnectedToTheTopWallRecursive(virtualGrid, isFirstRight, innerConnection.GridPosition, ignoredPositions);
         }
-
-        if (ignoredDirection != EnumDirections.RightUp && ignoredDirection != EnumDirections.Right &&
-            ignoredDirection != EnumDirections.RightDown)
-        {
-            var rightBubblePos = new Vector2Int(bubbleGridPos[0], bubbleGridPos[1] + 1);
-            var bubbleNumber = GetBubbleNumber(virtualGrid, rightBubblePos);
-            if (bubbleNumber == number && !parentConnection.Connections.Any(b => b.GridPosition.Equals(rightBubblePos)))
-            {
-                var newConnection = new BubbleConnection()
-                {
-                    Number = number,
-                    GridPosition = rightBubblePos,
-                    Connections = new List<BubbleConnection>(),
-                    ParentConnection = parentConnection
-                };
-                parentConnection.Connections.Add(newConnection);
-                GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, rightBubblePos, number, EnumDirections.Left, parentConnection);
-            }
-        }
-
-        if (ignoredDirection != EnumDirections.Right && ignoredDirection != EnumDirections.RightDown &&
-            ignoredDirection != EnumDirections.LeftDown)
-        {
-            var rightDownBubblePos = new Vector2Int(bubbleGridPos[0] + 1, bubbleGridPos[1] + (isRight ? 1 : 0));
-            var bubbleNumber = GetBubbleNumber(virtualGrid, rightDownBubblePos);
-            if (bubbleNumber == number && !parentConnection.Connections.Any(b => b.GridPosition.Equals(rightDownBubblePos)))
-            {
-                var newConnection = new BubbleConnection()
-                {
-                    Number = number,
-                    GridPosition = rightDownBubblePos,
-                    Connections = new List<BubbleConnection>(),
-                    ParentConnection = parentConnection
-                };
-                parentConnection.Connections.Add(newConnection);
-                GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, rightDownBubblePos, number, EnumDirections.LeftUp, parentConnection);
-            }
-        }
-
-        if (ignoredDirection != EnumDirections.Left && ignoredDirection != EnumDirections.LeftDown &&
-            ignoredDirection != EnumDirections.RightDown)
-        {
-            var leftDownBubblePos = new Vector2Int(bubbleGridPos[0] + 1, bubbleGridPos[1] + (isRight ? 0 : -1));
-            var bubbleNumber = GetBubbleNumber(virtualGrid, leftDownBubblePos);
-            if (bubbleNumber == number && !parentConnection.Connections.Any(b => b.GridPosition.Equals(leftDownBubblePos)))
-            {
-                var newConnection = new BubbleConnection()
-                {
-                    Number = number,
-                    GridPosition = leftDownBubblePos,
-                    Connections = new List<BubbleConnection>(),
-                    ParentConnection = parentConnection
-                };
-                parentConnection.Connections.Add(newConnection);
-                GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, leftDownBubblePos, number, EnumDirections.RightUp, parentConnection);
-            }
-        }
-
     }
 
 
     static void CalculateMergeDepthMap(List<int[]> virtualGrid, bool isFirstRight, Vector2Int bubbleGridPos, out BubbleConnection rootConnection, out List<List<int>> depthList)
     {
-        //var virtualGrid = virtualGrid.ToList();
-
         rootConnection = new BubbleConnection
+        {
+            Number = 0, //root connection's number should not be used.
+            GridPosition = bubbleGridPos,
+            Connections = new List<BubbleConnection>()
+        };
+        rootConnection.Connections.Add(new BubbleConnection()
         {
             Number = GetBubbleNumber(virtualGrid, bubbleGridPos),
             GridPosition = bubbleGridPos,
             Connections = new List<BubbleConnection>()
-        };
-
-        //We add same object without reference to prevent infinite loop.
-        rootConnection.Connections.Add(new BubbleConnection()
-        {
-            Number = rootConnection.Number,
-            GridPosition = bubbleGridPos,
-            Connections = new List<BubbleConnection>(),
-            ParentConnection = rootConnection
         });
+        GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, rootConnection.Connections[0], new List<Vector2Int>(), rootConnection.Connections);
+        //as we found the same numbered connected bubbles and now we can check if this bubble is connected to wall by means of other bubbles
+        //we ignore these bubbles because we will merge them into this one.
+        var ignoredPositions = rootConnection.Connections.Select(c => c.GridPosition).ToList();
 
-        //We add same object without reference to prevent infinite loop.
-
-        GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, bubbleGridPos, rootConnection.Number, EnumDirections.None, rootConnection);
-
-        //As there is a exception on NextNumber for the first level, we call this once manually.
-        foreach (var innerConnection in rootConnection.Connections)
+        foreach (var connection in rootConnection.Connections)
         {
-            GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, innerConnection.GridPosition, GetMergeResultNumber(rootConnection.Number, rootConnection.Connections.Count), EnumDirections.None, innerConnection);
-            if (innerConnection.Connections.Count > 0)
-                FindDeepConnectionsRecursive(virtualGrid, isFirstRight, innerConnection);
+            connection.IsConnectedToTheTopWall = IsConnectedToTheTopWallRecursive(virtualGrid, isFirstRight, connection.GridPosition, ignoredPositions);
+            FindDeepConnectionsRecursive2(virtualGrid, isFirstRight, connection);
         }
-
+        
         //Create depth list
-        //TODO: Eliminate ones that merge outside
         depthList = GetDepthListRecursive(rootConnection);
     }
 
@@ -710,8 +644,8 @@ public class BubbleGrid : MonoBehaviour
         CalculateMergeDepthMap(virtualGrid, isFirstRight, bubbleGridPos, out rootConnection, out var depthList);
 
         desiredMergePath = null;
-        //if (depthList.Count <= 1)
-        //    return;
+        if (depthList.Count == 0)
+            return;
 
         //Find desired depth path
         depthList = depthList.OrderBy(d => d.Count).ToList();
@@ -758,6 +692,8 @@ public class BubbleGrid : MonoBehaviour
         if (!nextPath.Any())
         {
             RemoveAnimationState(EnumAnimationStates.Merging);
+            AddNewBubbleToWaitingQueue();
+            PutNextBubbleToShooter();
             if (grid.Count < 4 || grid.Sum(l => l.Count(b => b != null)) < 18 && grid.Count < 8)
                 AddNewLine();
             return;
@@ -832,23 +768,22 @@ public class BubbleGrid : MonoBehaviour
 
     private void PopAllBubblesAround(Vector2Int _2048GridPos)
     {
-        var isLineRight = IsLineRight(isFirstRight, _2048GridPos[0]);
-        var leftGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.Left, isLineRight);
+        var leftGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.Left, isFirstRight);
         PopAndRemoveBubble(grid, leftGridPos, 0.05f);
 
-        var leftUpGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.LeftUp, isLineRight);
+        var leftUpGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.LeftUp, isFirstRight);
         PopAndRemoveBubble(grid, leftUpGridPos, 0.1f);
 
-        var rightUpGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.RightUp, isLineRight);
+        var rightUpGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.RightUp, isFirstRight);
         PopAndRemoveBubble(grid, rightUpGridPos, 0.15f);
 
-        var rightGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.Right, isLineRight);
+        var rightGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.Right, isFirstRight);
         PopAndRemoveBubble(grid, rightGridPos, 0.2f);
 
-        var rightDownGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.RightDown, isLineRight);
+        var rightDownGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.RightDown, isFirstRight);
         PopAndRemoveBubble(grid, rightDownGridPos, 0.25f);
 
-        var leftDownGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.LeftDown, isLineRight);
+        var leftDownGridPos = GetGridPositionByDirection(_2048GridPos, EnumDirections.LeftDown, isFirstRight);
         PopAndRemoveBubble(grid, leftDownGridPos, 0.3f);
 
         PopAndRemoveBubble(grid, _2048GridPos, 0.35f);
@@ -862,6 +797,8 @@ public class BubbleGrid : MonoBehaviour
         for (int i = 0; i < connection.Connections.Count; i++)
         {
             var childConnection = connection.Connections[i];
+            if (!childConnection.IsConnectedToTheTopWall)
+                continue;
             var childList = GetDepthListRecursive(childConnection);
             if (childList.Any())
             {
@@ -881,34 +818,60 @@ public class BubbleGrid : MonoBehaviour
 
         return myList;
     }
-
-    static void FindDeepConnectionsRecursive(List<int[]> virtualGrid, bool isFirstRight, BubbleConnection connection)
+    
+    static bool IsConnectedToTheTopWallRecursive(List<int[]> virtualGrid, bool isFirstRight, Vector2Int gridPos, List<Vector2Int> visitedPoints)
     {
-        foreach (var innerConnection in connection.Connections)
+        visitedPoints.Add(gridPos);
+
+        //swarm to all 6 directions
+        var directions = new EnumDirections[]
         {
-            GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, innerConnection.GridPosition, innerConnection.NextNumber, EnumDirections.None, innerConnection);
-            if (innerConnection.Connections.Count > 0)
-                FindDeepConnectionsRecursive(virtualGrid, isFirstRight, innerConnection);
+            EnumDirections.Left,
+            EnumDirections.LeftUp,
+            EnumDirections.RightUp,
+            EnumDirections.Right,
+            EnumDirections.RightDown,
+            EnumDirections.LeftDown
+        };
+
+        for (int i = 0; i < directions.Length; i++)
+        {
+            var dirGridPos = GetGridPositionByDirection(gridPos, directions[i], isFirstRight);
+            if (!IsBubbleGridPositionValid(virtualGrid, dirGridPos))
+                continue;
+            //If there is no bubble on this direction, what are we doing here.
+            if(virtualGrid[dirGridPos[0]][dirGridPos[1]] == 0)
+                continue;
+            //If we touch the top wall, go and tell everyone!
+            if (dirGridPos[0] == 0)
+                return true;
+            var isVisited = visitedPoints.Any(v => v[0] == dirGridPos[0] && v[1] == dirGridPos[1]);
+            if (!isVisited)
+            {
+                if (IsConnectedToTheTopWallRecursive(virtualGrid, isFirstRight, dirGridPos, visitedPoints))
+                    return true;
+            }
         }
+
+        return false;
     }
 
     static int GetMergeResultNumber(int number, int count)
     {
+        //we don't check if number or count in valid range. if something is broken, we want to see an error.
         count += Globals.NumberIndexDic[number];
         if (count >= 11)
             return 2048;
-        if (count <= 1)
-            return 2;
         return (int)Math.Pow(2, count);
     }
 
     class BubbleConnection
     {
+        public bool IsConnectedToTheTopWall { get; set; }
         public int Number { get; set; }
 
-        public int NextNumber => GetMergeResultNumber(Number, ParentConnection.Connections.Count + 1);
+        public int GrandChildNumber => GetMergeResultNumber(Number * 2, Connections.Count);
 
-        public BubbleConnection ParentConnection { get; set; }
         public Vector2Int GridPosition { get; set; }
         public List<BubbleConnection> Connections { get; set; }
     }
@@ -926,8 +889,9 @@ public class BubbleGrid : MonoBehaviour
         return bubbleSize / 2 * (IsLineRight(isFirstRight, lineIndex) ? 1 : 0);
     }
 
-    static Vector2Int GetGridPositionByDirection(Vector2Int referenceGridPos, EnumDirections direction, bool isLineRight)
+    static Vector2Int GetGridPositionByDirection(Vector2Int referenceGridPos, EnumDirections direction, bool isFirstRight)
     {
+        var isLineRight = IsLineRight(isFirstRight, referenceGridPos[0]);
         Vector2Int diff;
 
         switch (direction)
@@ -1020,7 +984,7 @@ public class BubbleGrid : MonoBehaviour
         ////REMOVE
 
         //we keep the number of possible merges of numbers and sum of possible merges for each point in the current grid state
-
+        //index 0: count of positions, 1: sum of merge depths
         Vector2Int[] numberMergeDepthArray = new Vector2Int[11];
 
         //calculate depth for each position
@@ -1031,15 +995,16 @@ public class BubbleGrid : MonoBehaviour
             var surroundingBubblePositions = GetSurroundingBubbleGridPositions(virtualGrid, isFirstRight, edgePos);
 
             //get depth path for each numbers on the edgePos
-            foreach (var surroundingBubblePosition in surroundingBubblePositions)
+            var surroundingBubbleNumbers = GetSurroundingBubbleNumbers(virtualGrid, isFirstRight, edgePos);
+            foreach (var surroundingBubbleNumberCount in surroundingBubbleNumbers)
             {
-                var surroundingNumber = virtualGrid[surroundingBubblePosition[0]][surroundingBubblePosition[1]];
+                var surroundingNumber = surroundingBubbleNumberCount.Key;
                 //We need to put a Bubble to the position temporarily to simulate as if this bubble is there. We will then remove it.
                 virtualGrid[edgePos[0]][edgePos[1]] = surroundingNumber;
                 GetDesiredMergePath(virtualGrid, isFirstRight, edgePos, out _, out var desiredMergePath);
                 virtualGrid[edgePos[0]][edgePos[1]] = 0;
-                numberMergeDepthArray[Globals.NumberIndexDic[surroundingNumber]][1] += desiredMergePath.Count; //sum of all merge points' merge count
-                numberMergeDepthArray[Globals.NumberIndexDic[surroundingNumber]][0]++; //how many possible merge points for this number
+                numberMergeDepthArray[Globals.NumberIndexDic[surroundingNumber]][0] += surroundingBubbleNumberCount.Value; //how many possible merge points for this number
+                numberMergeDepthArray[Globals.NumberIndexDic[surroundingNumber]][1] += desiredMergePath?.Count ?? 0; //TODO: Remove this null check. this is put to have a workinig version on git. //sum of all merge points' merge count
             }
         }
 
@@ -1062,6 +1027,21 @@ public class BubbleGrid : MonoBehaviour
 
         //We choose the number with highest score
         return Globals.IndexNumberDic[scoreDic.OrderByDescending(s => s.Value).Select(s => s.Key).First()];
+    }
+
+    //key: number, value: count
+    static Dictionary<int, int> GetSurroundingBubbleNumbers(List<int[]> virtualGrid, bool isFirstRight, Vector2Int gridPos)
+    {
+        var surroundingBubblePositions = GetSurroundingBubbleGridPositions(virtualGrid, isFirstRight, gridPos);
+        var numberDic = new Dictionary<int, int>();
+        foreach (Vector2Int surroundingBubblePosition in surroundingBubblePositions)
+        {
+            var number = GetBubbleNumber(virtualGrid, surroundingBubblePosition);
+            if (!numberDic.ContainsKey(number))
+                numberDic[number] = 0;
+            numberDic[number]++;
+        }
+        return numberDic;
     }
 
     static List<Vector2Int> GetSurroundingBubbleGridPositions(List<int[]> virtualGrid, bool isFirstRight, Vector2Int gridPos)
