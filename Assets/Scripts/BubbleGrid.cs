@@ -224,6 +224,7 @@ public class BubbleGrid : MonoBehaviour
         AddNewLine(new int[] { 8, 4, 4, 16, 32, 32 }, false);
         AddNewLine(new int[] { 2, 4, 4, 16, 32, 32 }, false);
         AddNewLine(new int[] { 2, 4, 4, 16, 32, 32 }, false);
+        //AddNewLine(new int[] { 32, 32, 32, 16, 32, 32 }, false);
     }
 
 
@@ -599,7 +600,7 @@ public class BubbleGrid : MonoBehaviour
         {
             //as we found the same numbered connected bubbles and now we can check if this bubble is connected to wall by means of other bubbles
             //we ignore these bubbles because we will merge them into this one.
-            sameLevelConnection.IsConnectedToTheTopWall = IsConnectedToTheTopWallRecursive(virtualGrid, isFirstRight, sameLevelConnection.GridPosition, ignoredPositions);
+            sameLevelConnection.IsConnectedToTheTopWall = IsConnectedToTheTopWallRecursive(virtualGrid, isFirstRight, sameLevelConnection.GridPosition, ignoredPositions.ToList());
             //imagining a merged point here
             var mergedLowLevelConnection = new BubbleConnection()
             {
