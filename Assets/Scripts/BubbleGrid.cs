@@ -20,7 +20,7 @@ public class BubbleGrid : MonoBehaviour
     public Animator MultiplierAnimator;
 
 
-    private const int BubblePerLine = 6; //If you change this number, you should implement scaling bubbles.
+    private static readonly int BubblePerLine = 6; //If you change this number, you should implement scaling bubbles.
 
     //We will add new line at zero index. So, list order will match the UI.
     private readonly List<Bubble[]> grid = new List<Bubble[]>();
@@ -215,7 +215,7 @@ public class BubbleGrid : MonoBehaviour
 
     void InitGrid()
     {
-        AddNewLine(false);
+        AddNewLine(new int[] { 2, 4, 4, 16, 32, 32 }, false);
         AddNewLine(false);
         AddNewLine(false);
         AddNewLine(false);
@@ -323,7 +323,7 @@ public class BubbleGrid : MonoBehaviour
         if (_emptyCircleGridPos[0] > -1 && _emptyCircleGridPos[1] > -1)
         {
             if (_emptyCircleGridPos[0] == grid.Count)
-                grid.Add(new Bubble[6]);
+                grid.Add(new Bubble[BubblePerLine]);
             grid[_emptyCircleGridPos[0]][_emptyCircleGridPos[1]] = shooterCurrentBubble;
             shooterCurrentBubble.IgnoreRaycast = false;
             shooterCurrentBubble.MoveTo(shootDestinations, 5);
@@ -357,10 +357,10 @@ public class BubbleGrid : MonoBehaviour
             new Vector2Int(1, isRight ? 0 : -1) //left down
         };
         float distance = 0.015f;
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < BubblePerLine; i++)
         {
             var bubblePos = gridPos + surroundingGridPosDiffs[i];
-            if (bubblePos[1] > -1 && bubblePos[1] < 6 && bubblePos[0] > -1 && grid.Count > bubblePos[0] && grid[bubblePos[0]][bubblePos[1]] != null)
+            if (bubblePos[1] > -1 && bubblePos[1] < BubblePerLine && bubblePos[0] > -1 && grid.Count > bubblePos[0] && grid[bubblePos[0]][bubblePos[1]] != null)
             {
                 var bubble = grid[bubblePos[0]][bubblePos[1]];
                 var angle = 2 * Math.PI / 6 * i + Math.PI; //As we start from left, we add some more radian to rotate it.
@@ -473,7 +473,7 @@ public class BubbleGrid : MonoBehaviour
     void AddNewBubble(int lineIndex, int columnIndex, int number)
     {
         if (lineIndex == grid.Count)
-            grid.Add(new Bubble[6]);
+            grid.Add(new Bubble[BubblePerLine]);
         grid[lineIndex][columnIndex] = Instantiate(BubblePrefab, Holder.transform, true).GetComponent<Bubble>();
         grid[lineIndex][columnIndex].transform.position = new Vector3(Holder.transform.position.x + columnIndex * bubbleSize + GetLineIndent(lineIndex), transform.position.y - (lineIndex + 1) * bubbleVerticalDistance, 0);
         grid[lineIndex][columnIndex].Number = number;
@@ -481,13 +481,23 @@ public class BubbleGrid : MonoBehaviour
 
     void AddNewLine(bool animate = true)
     {
+        var numbers = new int[BubblePerLine];
+        for (int i = 0; i < BubblePerLine; i++)
+        {
+            numbers[i] = GetRandomNumber();
+        }
+        AddNewLine(numbers, animate);
+    }
+
+    void AddNewLine(int[] numbers, bool animate = true)
+    {
         var newLine = new Bubble[BubblePerLine];
         isFirstRight = !isFirstRight;
         for (int i = 0; i < BubblePerLine; i++)
         {
             newLine[i] = Instantiate(BubblePrefab, Holder.transform, true).GetComponent<Bubble>();
             newLine[i].transform.position = new Vector3(Holder.transform.position.x + i * bubbleSize + GetLineIndent(0), transform.position.y, 0);
-            newLine[i].Number = GetRandomNumber();
+            newLine[i].Number = numbers[i];
         }
 
         grid.Insert(0, newLine);
@@ -517,12 +527,12 @@ public class BubbleGrid : MonoBehaviour
 
     static bool IsBubbleGridPositionValid(List<Bubble[]> grid, Vector2Int bubbleGridPos)
     {
-        return !(grid.Count <= bubbleGridPos[0] || bubbleGridPos[0] < 0 || bubbleGridPos[1] < 0 || bubbleGridPos[1] >= 6);
+        return !(grid.Count <= bubbleGridPos[0] || bubbleGridPos[0] < 0 || bubbleGridPos[1] < 0 || bubbleGridPos[1] >= BubblePerLine);
     }
 
     static bool IsBubbleGridPositionValid(List<int[]> virtualGrid, Vector2Int bubbleGridPos)
     {
-        return !(virtualGrid.Count <= bubbleGridPos[0] || bubbleGridPos[0] < 0 || bubbleGridPos[1] < 0 || bubbleGridPos[1] >= 6);
+        return !(virtualGrid.Count <= bubbleGridPos[0] || bubbleGridPos[0] < 0 || bubbleGridPos[1] < 0 || bubbleGridPos[1] >= BubblePerLine);
     }
 
     static Bubble GetBubble(List<Bubble[]> grid, Vector2Int bubbleGridPos)
@@ -954,7 +964,7 @@ public class BubbleGrid : MonoBehaviour
         var edgePointsDic = new Dictionary<Vector2Int, bool>();
 
         //We need a empty line at the end as a start point
-        virtualGrid.Add(new int[6]);
+        virtualGrid.Add(new int[BubblePerLine]);
 
         var swarmStartPoint = new Vector2Int(virtualGrid.Count - 1, 0);
         SwarmUntilBubbleRecursive(virtualGrid, isFirstRight, new List<Vector2Int>(), edgePointsDic, swarmStartPoint);
@@ -1014,7 +1024,7 @@ public class BubbleGrid : MonoBehaviour
         Vector2Int[] numberMergeDepthArray = new Vector2Int[11];
 
         //calculate depth for each position
-        virtualGrid.Add(new int[6]); //we will be putting temporary bubbles on edges to test. so we need an extra line.
+        virtualGrid.Add(new int[BubblePerLine]); //we will be putting temporary bubbles on edges to test. so we need an extra line.
         foreach (var edgePos in edgePositions)
         {
             //get numbers of surrouding bubbles
@@ -1089,7 +1099,7 @@ public class BubbleGrid : MonoBehaviour
         var virtualGrid = new List<int[]>();
         foreach (Bubble[] bubbles in grid)
         {
-            var newLine = new int[6];
+            var newLine = new int[BubblePerLine];
             for (int i = 0; i < bubbles.Length; i++)
             {
                 newLine[i] = bubbles[i]?.Number ?? 0;

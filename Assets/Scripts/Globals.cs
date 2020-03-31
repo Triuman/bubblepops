@@ -7,7 +7,7 @@ public static class Globals
     //if 1, we will choose the deepest path. if 0, we will choose the shortest.
     public static float MergeDepthScale = 1;
     //if 1, we choose the number with highest possible merge, if 0, we choose the number with the highest possible merge positions count
-    public static float NextNumberDepthToCountScale = 1;
+    public static float NextNumberDepthToCountScale = 0;
     public static float AnimationSpeedScale = 1;
     public static float WaitSecondsBeforeMerge = 0.2f;
 
