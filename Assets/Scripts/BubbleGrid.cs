@@ -589,23 +589,31 @@ public class BubbleGrid : MonoBehaviour
         }
     }
 
-    static void FindDeepConnectionsRecursive2(List<int[]> virtualGrid, bool isFirstRight, BubbleConnection connection)
+    static void FindDeepConnectionsRecursive2(List<int[]> virtualGrid, bool isFirstRight, List<BubbleConnection> sameLevelConnections)
     {
+        var ignoredPositions = sameLevelConnections.Select(c => c.GridPosition).ToList();
         //As there is a exception on NextNumber for the first level, we call this once manually.
-        foreach (var innerConnection in connection.Connections)
+        foreach (var sameLevelConnection in sameLevelConnections)
         {
-            //imagining a merged point here
-            innerConnection.Connections.Add(new BubbleConnection()
-            {
-                Number = GetMergeResultNumber(innerConnection.Number, connection.Connections.Count),
-                GridPosition = innerConnection.GridPosition,
-                Connections = new List<BubbleConnection>()
-            });
-            GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, innerConnection.Connections[0], new List<Vector2Int>(), innerConnection.Connections);
             //as we found the same numbered connected bubbles and now we can check if this bubble is connected to wall by means of other bubbles
             //we ignore these bubbles because we will merge them into this one.
-            var ignoredPositions = connection.Connections.Select(c => c.GridPosition).ToList();
-            innerConnection.IsConnectedToTheTopWall = IsConnectedToTheTopWallRecursive(virtualGrid, isFirstRight, innerConnection.GridPosition, ignoredPositions);
+            sameLevelConnection.IsConnectedToTheTopWall = IsConnectedToTheTopWallRecursive(virtualGrid, isFirstRight, sameLevelConnection.GridPosition, ignoredPositions);
+            //imagining a merged point here
+            var mergedLowLevelConnection = new BubbleConnection()
+            {
+                Number = GetMergeResultNumber(sameLevelConnection.Number, sameLevelConnections.Count),
+                GridPosition = sameLevelConnection.GridPosition,
+                Connections = new List<BubbleConnection>()
+            };
+            sameLevelConnection.Connections.Add(mergedLowLevelConnection);
+            //getting same numbers with our merged point. if this level is 2 and there are 3 of them, now we are gonna look for 8s around this point
+            GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, mergedLowLevelConnection, new List<Vector2Int>(), sameLevelConnection.Connections);
+            //now we got merged low level connection and its friends
+            //if it got now friend, we say sorry and go back since we cannot merge further
+            if (sameLevelConnection.Connections.Count == 1)
+                continue;
+            //we send them to be foreach'ed until none of them have same level friends
+            FindDeepConnectionsRecursive2(virtualGrid, isFirstRight, sameLevelConnection.Connections);
         }
     }
 
@@ -625,16 +633,8 @@ public class BubbleGrid : MonoBehaviour
             Connections = new List<BubbleConnection>()
         });
         GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, rootConnection.Connections[0], new List<Vector2Int>(), rootConnection.Connections);
-        //as we found the same numbered connected bubbles and now we can check if this bubble is connected to wall by means of other bubbles
-        //we ignore these bubbles because we will merge them into this one.
-        var ignoredPositions = rootConnection.Connections.Select(c => c.GridPosition).ToList();
+        FindDeepConnectionsRecursive2(virtualGrid, isFirstRight, rootConnection.Connections);
 
-        foreach (var connection in rootConnection.Connections)
-        {
-            connection.IsConnectedToTheTopWall = IsConnectedToTheTopWallRecursive(virtualGrid, isFirstRight, connection.GridPosition, ignoredPositions);
-            FindDeepConnectionsRecursive2(virtualGrid, isFirstRight, connection);
-        }
-        
         //Create depth list
         depthList = GetDepthListRecursive(rootConnection);
     }
@@ -648,6 +648,7 @@ public class BubbleGrid : MonoBehaviour
             return;
 
         //Find desired depth path
+        //TODO: Use this: MergeHeightScale
         depthList = depthList.OrderBy(d => d.Count).ToList();
         var minDepth = depthList.Min(d => d.Count);
         var maxDepth = depthList.Max(d => d.Count);
@@ -1004,7 +1005,7 @@ public class BubbleGrid : MonoBehaviour
                 GetDesiredMergePath(virtualGrid, isFirstRight, edgePos, out _, out var desiredMergePath);
                 virtualGrid[edgePos[0]][edgePos[1]] = 0;
                 numberMergeDepthArray[Globals.NumberIndexDic[surroundingNumber]][0] += surroundingBubbleNumberCount.Value; //how many possible merge points for this number
-                numberMergeDepthArray[Globals.NumberIndexDic[surroundingNumber]][1] += desiredMergePath?.Count ?? 0; //TODO: Remove this null check. this is put to have a workinig version on git. //sum of all merge points' merge count
+                numberMergeDepthArray[Globals.NumberIndexDic[surroundingNumber]][1] += desiredMergePath.Count; //sum of all merge points' merge count
             }
         }
 

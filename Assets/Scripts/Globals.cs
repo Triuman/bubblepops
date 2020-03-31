@@ -4,9 +4,13 @@ using UnityEngine;
 
 public static class Globals
 {
-    //if 1, we will choose the deepest path. if 0, we will choose the shortest.
+    //MergeDepthScale; if 1, we will choose the deepest path. if 0, we will choose the shortest.
     public static float MergeDepthScale = 1;
-    //if 1, we choose the number with highest possible merge, if 0, we choose the number with the highest possible merge positions count
+
+    //MergeHeightScale; this is only possible if there are more than one options to choose. if 1, we choose the merge option on the toppest line, so closest to the top wall. if 0, we choose the lowest line, so closest to shooter.
+    public static float MergeHeightScale = 1;
+
+    //NextNumberDepthToCountScale; if 1, we choose the number with highest possible merge, if 0, we choose the number with the highest possible merge positions count
     public static float NextNumberDepthToCountScale = 0;
     public static float AnimationSpeedScale = 0.5f;
     public static float WaitSecondsBeforeMerge = 0.2f;
