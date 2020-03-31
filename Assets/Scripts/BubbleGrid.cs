@@ -64,7 +64,7 @@ public class BubbleGrid : MonoBehaviour
 
         //TODO: show new level value
         var level = GetLevel(_score);
-        Debug.Log("level -> " + level);
+        //Debug.Log("level -> " + level);
     }
     static float GetLevel(float score)
     {
@@ -1010,27 +1010,26 @@ public class BubbleGrid : MonoBehaviour
         ////REMOVE
 
         //we keep the number of possible merges of numbers and sum of possible merges for each point in the current grid state
-        Dictionary<int, Vector2Int> numberMergeDepthDictionary = new Dictionary<int, Vector2Int>();
+
+        Vector2Int[] numberMergeDepthArray = new Vector2Int[11];
 
         //calculate depth for each position
         virtualGrid.Add(new int[6]); //we will be putting temporary bubbles on edges to test. so we need an extra line.
         foreach (var edgePos in edgePositions)
         {
             //get numbers of surrouding bubbles
-            var surroundingNumbers = GetSurroundingBubbleNumbers(virtualGrid, isFirstRight, edgePos);
+            var surroundingBubblePositions = GetSurroundingBubbleGridPositions(virtualGrid, isFirstRight, edgePos);
 
             //get depth path for each numbers on the edgePos
-            foreach (var surroundingNumber in surroundingNumbers)
+            foreach (var surroundingBubblePosition in surroundingBubblePositions)
             {
+                var surroundingNumber = virtualGrid[surroundingBubblePosition[0]][surroundingBubblePosition[1]];
                 //We need to put a Bubble to the position temporarily to simulate as if this bubble is there. We will then remove it.
                 virtualGrid[edgePos[0]][edgePos[1]] = surroundingNumber;
                 GetDesiredMergePath(virtualGrid, isFirstRight, edgePos, out _, out var desiredMergePath);
                 virtualGrid[edgePos[0]][edgePos[1]] = 0;
-                if (!numberMergeDepthDictionary.ContainsKey(surroundingNumber))
-                    numberMergeDepthDictionary[surroundingNumber] = new Vector2Int();
-                var numberVecInt = numberMergeDepthDictionary[surroundingNumber];
-                numberVecInt[0]++; //how many possible merge points for this number
-                numberVecInt[1] += desiredMergePath.Count; //sum of all merge points' merge count
+                numberMergeDepthArray[Globals.NumberIndexDic[surroundingNumber]][1] += desiredMergePath.Count; //sum of all merge points' merge count
+                numberMergeDepthArray[Globals.NumberIndexDic[surroundingNumber]][0]++; //how many possible merge points for this number
             }
         }
 
@@ -1038,24 +1037,26 @@ public class BubbleGrid : MonoBehaviour
         var sumRatio = Globals.NextNumberDepthToCountScale;
 
         //normalize data and calculate the score for each number
-        var maxPositionCount = numberMergeDepthDictionary.Max(a => a.Value[0]);
-        var maxSum = numberMergeDepthDictionary.Max(a => a.Value[1]);
+        var maxPositionCount = numberMergeDepthArray.Max(a => a[0]);
+        var maxSum = numberMergeDepthArray.Max(a => a[1]);
         var scoreDic = new Dictionary<int, float>();
-        foreach (var numberVecInt in numberMergeDepthDictionary)
+
+        for (var numberIndex = 0; numberIndex < numberMergeDepthArray.Length; numberIndex++)
         {
-            var count = (float)numberVecInt.Value[0] / maxPositionCount;
-            var sum = (float)numberVecInt.Value[1] / maxSum;
+            var numberVecInt = numberMergeDepthArray[numberIndex];
+            var count = (float) numberVecInt[0] / maxPositionCount;
+            var sum = (float) numberVecInt[1] / maxSum;
             var score = countRatio * count + sumRatio * sum;
-            scoreDic[numberVecInt.Key] = score;
+            scoreDic[numberIndex] = score;
         }
 
         //We choose the number with highest score
-        return scoreDic.OrderByDescending(s => s.Value).Select(s => s.Key).First();
+        return Globals.IndexNumberDic[scoreDic.OrderByDescending(s => s.Value).Select(s => s.Key).First()];
     }
 
-    static List<int> GetSurroundingBubbleNumbers(List<int[]> virtualGrid, bool isFirstRight, Vector2Int gridPos)
+    static List<Vector2Int> GetSurroundingBubbleGridPositions(List<int[]> virtualGrid, bool isFirstRight, Vector2Int gridPos)
     {
-        var surroundingNumbers = new List<int>();
+        var surroundingBubblePositions = new List<Vector2Int>();
         var directions = new EnumDirections[]
         {
             EnumDirections.Left,
@@ -1070,10 +1071,10 @@ public class BubbleGrid : MonoBehaviour
             var dirGridPos = GetGridPositionByDirection(gridPos, directions[i], isFirstRight);
             var bubbleNumber = GetBubbleNumber(virtualGrid, dirGridPos);
             if (bubbleNumber != 0)
-                surroundingNumbers.Add(bubbleNumber);
+                surroundingBubblePositions.Add(dirGridPos);
         }
 
-        return surroundingNumbers;
+        return surroundingBubblePositions;
     }
 
     static int GetBubbleNumber(List<int[]> virtualGrid, Vector2Int gridPos)

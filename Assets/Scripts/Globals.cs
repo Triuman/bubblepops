@@ -41,4 +41,19 @@ public static class Globals
         { 1024, 9 },
         { 2048, 10 },
     };
+
+    public static Dictionary<int, int> IndexNumberDic = new Dictionary<int, int>()
+    {
+        {  0  , 2 },
+        {  1  , 4 },
+        {  2  , 8 },
+        {   3 , 16   },
+        {   4 , 32   },
+        {   5 , 64   },
+        {  6  , 128 },
+        {  7  , 256 },
+        {  8  , 512 },
+        {  9  , 1024 },
+        {  10 ,2048}
+    };
 }
