@@ -15,20 +15,12 @@ public static class Globals
     public static float AnimationSpeedScale = 1f;
     public static float WaitSecondsBeforeMerge = 0.2f;
 
-
-
-    public static Color WhiteModeBackground = new Color();
-    public static Color WhiteModeHolder = new Color();
-
-    public static Color NightModeBackground = new Color();
-    public static Color NightModeHolder = new Color(); //3D3D3D
-
-
+    
     public static Color GetLevelColor(int level)
     {
         var index = level % Globals.NumberColorDic.Count - 1;
-        var number = Globals.IndexNumberDic[level % Globals.NumberColorDic.Count - 1];
-        var color = Globals.NumberColorDic[Globals.IndexNumberDic[level % Globals.NumberColorDic.Count - 1]];
+        var number = Globals.IndexNumberDic[Mathf.Clamp(index, 0, Globals.IndexNumberDic.Count - 1)];
+        var color = Globals.NumberColorDic[number];
         color.a = 1;
         return color;
     }

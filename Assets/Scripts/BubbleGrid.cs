@@ -832,7 +832,11 @@ public class BubbleGrid : MonoBehaviour
         {
             foreach (var childConnection in connection.Connections)
             {
+                if (!IsBubbleGridPositionValid(grid, childConnection.GridPosition))
+                    continue;
                 var bubble = grid[childConnection.GridPosition[0]][childConnection.GridPosition[1]];
+                if(!bubble)
+                    continue;
                 grid[childConnection.GridPosition[0]][childConnection.GridPosition[1]] = null;
                 bubble.MoveTo(new List<Vector3>(){ bubble.transform.localPosition }, 1f);
                 bubble.Arrived += OnBubbleArriveMergePoint;
