@@ -17,10 +17,22 @@ public class Bubble : MonoBehaviour
 
     //We will use this Id to quickly find a hit bubble in the grid.
     public int Id { get; private set; }
-    public int Number = 2;
+
+    public int Number
+    {
+        get => number;
+        set
+        {
+            number = value;
+            InitCircle();
+        }
+    }
+
     private GameObject circle;
     
     private int defaultLayer = 0;
+
+    private bool isLeftTheGrid = false;
 
 
     private bool ignoreRaycast = false;
@@ -43,7 +55,6 @@ public class Bubble : MonoBehaviour
     void Start()
     {
         Id = Random.Range(1, 10000000);
-        InitCircle();
     }
 
     void InitCircle()
@@ -75,10 +86,19 @@ public class Bubble : MonoBehaviour
 
     private float secondsToPop;
     private bool isGoingToPop = false;
+    private int number;
+
     public void Pop(float delay = 0)
     {
         secondsToPop = delay;
         isGoingToPop = true;
+    }
+    public void LeaveTheGrid()
+    {
+        IgnoreRaycast = true;
+        GetComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Dynamic;
+        GetComponent<Rigidbody2D>().AddForce(new Vector2(Random.Range(-15f, 15f), Random.Range(-50f, 4f)));
+        isLeftTheGrid = true;
     }
 
     // Update is called once per frame
@@ -116,6 +136,14 @@ public class Bubble : MonoBehaviour
                 if(targetPositions.Count == 0)
                     Arrived?.Invoke(this);
             }
+        }
+    }
+
+    void OnTriggerEnter2D(Collider2D collider2D)
+    {
+        if (collider2D.tag == "floor" && isLeftTheGrid)
+        {
+            Pop();
         }
     }
 }

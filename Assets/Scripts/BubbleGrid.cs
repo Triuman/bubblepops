@@ -20,6 +20,8 @@ public class BubbleGrid : MonoBehaviour
     public Animator MultiplierAnimator;
 
 
+    public LevelMeter LevelMeter;
+
     private static readonly int BubblePerLine = 6; //If you change this number, you should implement scaling bubbles.
 
     //We will add new line at zero index. So, list order will match the UI.
@@ -33,16 +35,20 @@ public class BubbleGrid : MonoBehaviour
     Vector2? touchPositionWorld = null;
     Vector3 holderTargetPos;
 
+    private float waitingToShooterMoveSpeed = 1;
+    private float shootSpeed = 3;
+    private float holderScrollSpeed = 3;
     private Bubble shooterCurrentBubble;
     List<Bubble> waitingQueue = new List<Bubble>();
 
     private float _score = 0;
-    private float _multiplier = 1;
+    private int _multiplier = 1;
 
     private void IncreaseMultiplier()
     {
         _multiplier++;
         TxtMultiplier.text = "x" + _multiplier;
+        TxtMultiplier.color = Globals.GetLevelColor(_multiplier * 2); //multiplying by 2 to get different colors than levels
         TxtMultiplierBig.text = TxtMultiplier.text;
         MultiplierAnimator.Play("MultiplierTextGrow", 0, 0);
     }
@@ -57,14 +63,13 @@ public class BubbleGrid : MonoBehaviour
         _score += value * _multiplier;
         string scoreText = "";
         if (_score >= 1000)
-            scoreText = _score / 1000 + "K";
+            scoreText = (_score / 1000).ToString(".##") + "K";
         else
             scoreText = _score.ToString();
         TxtScore.text = scoreText;
 
-        //TODO: show new level value
         var level = GetLevel(_score);
-        //Debug.Log("level -> " + level);
+        LevelMeter.Level = level;
     }
     static float GetLevel(float score)
     {
@@ -103,7 +108,7 @@ public class BubbleGrid : MonoBehaviour
     }
     void RemoveAnimationState(EnumAnimationStates state)
     {
-        currentAnimationStateBinary ^= (int)state;
+        currentAnimationStateBinary ^= currentAnimationStateBinary & (int)state;
     }
 
     // Start is called before the first frame update
@@ -117,6 +122,7 @@ public class BubbleGrid : MonoBehaviour
         AddNewBubbleToWaitingQueue(2);
         AddNewBubbleToWaitingQueue(GetRandomNumber());
         PutNextBubbleToShooter();
+        AddScore(0);
     }
 
     Vector3 GlobalPositionToScaledHolderPosition(Vector3 position)
@@ -133,13 +139,13 @@ public class BubbleGrid : MonoBehaviour
         if (waitingQueue.Count == 0)
         {
             AddNewBubbleToWaitingQueue();
-            Debug.LogError("Waiting Queue was empty! Be careful next time.");
+            Debug.LogWarning("Waiting Queue was empty! Be careful next time.");
         }
         shooterCurrentBubble = waitingQueue[0];
         waitingQueue.RemoveAt(0);
         shooterCurrentBubble.transform.position = new Vector3(shooterCurrentBubble.transform.position.x, shooterCurrentBubble.transform.position.y, BubblePrefab.transform.localPosition.z);
         shooterCurrentBubble.ScaleTo(new List<Vector2>() { shooterCurrentBubble.transform.localScale / 0.7f }, 0.6f);
-        shooterCurrentBubble.MoveTo(new List<Vector3>() { GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position) }, 1);
+        shooterCurrentBubble.MoveTo(new List<Vector3>() { GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position) }, waitingToShooterMoveSpeed);
         AddAnimationState(EnumAnimationStates.PuttingBubbleToShooter);
         shooterCurrentBubble.Arrived += OnBubbleArrivedToShooter;
     }
@@ -152,7 +158,6 @@ public class BubbleGrid : MonoBehaviour
 
     void AddNewBubbleToWaitingQueue(int number = -1)
     {
-        Debug.LogError("Adding new to queue!");
         if (IsInAnimationState(EnumAnimationStates.Merging))
         {
             Debug.LogError("We are still merging. This will cause miscalculation. Do it after merging is done.");
@@ -189,14 +194,13 @@ public class BubbleGrid : MonoBehaviour
         {
             if (IsInAnimationState(EnumAnimationStates.AddingNewLine))
             {
-                Holder.transform.localPosition = Vector3.MoveTowards(Holder.transform.localPosition, holderTargetPos, 5 * Time.deltaTime);
+                Holder.transform.localPosition = Vector3.MoveTowards(Holder.transform.localPosition, holderTargetPos, holderScrollSpeed * Time.deltaTime * Globals.AnimationSpeedScale);
                 //We move the shooter bubble and queue bubbles so they stay where they were comparing to screen.
-                shooterCurrentBubble.transform.localPosition =
-                    GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position);
+                //shooterCurrentBubble.transform.localPosition = GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position);
+                //shooterCurrentBubble.MoveTo(new List<Vector3>() {GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position)}, waitingToShooterMoveSpeed);
                 foreach (Bubble bubble in waitingQueue.ToArray())
                 {
-                    bubble.transform.localPosition =
-                        GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position + new Vector3(-bubbleSize, 0));
+                    bubble.transform.localPosition = GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position + new Vector3(-bubbleSize, 0));
                 }
                 if (Vector3.Distance(Holder.transform.localPosition, holderTargetPos) < 0.001f)
                 {
@@ -220,11 +224,11 @@ public class BubbleGrid : MonoBehaviour
 
     void InitGrid()
     {
-        AddNewLine(new int[] { 2, 4, 4, 16, 32, 32 }, false);
-        AddNewLine(new int[] { 8, 4, 4, 16, 32, 32 }, false);
-        AddNewLine(new int[] { 2, 4, 4, 16, 32, 32 }, false);
-        AddNewLine(new int[] { 2, 4, 4, 16, 32, 32 }, false);
-        //AddNewLine(new int[] { 32, 32, 32, 16, 32, 32 }, false);
+        AddNewLine(new int[] { 0,0,0,0,0,0}, false);
+        AddNewLine(new int[] { 0,0,0,0,512,0}, false);
+        AddNewLine(new int[] { 0,0,0,0,4,2}, false);
+        AddNewLine(new int[] { 0,0,0,0,0,4}, false);
+        AddNewLine(new int[] { 0,0,0,0,8,16}, false);
     }
 
 
@@ -332,7 +336,7 @@ public class BubbleGrid : MonoBehaviour
                 grid.Add(new Bubble[BubblePerLine]);
             grid[_emptyCircleGridPos[0]][_emptyCircleGridPos[1]] = shooterCurrentBubble;
             shooterCurrentBubble.IgnoreRaycast = false;
-            shooterCurrentBubble.MoveTo(shootDestinations, 5);
+            shooterCurrentBubble.MoveTo(shootDestinations, shootSpeed);
             shooterCurrentBubble.Arrived += OnShootedBubbleArrived;
             AddAnimationState(EnumAnimationStates.Shooting);
         }
@@ -341,6 +345,8 @@ public class BubbleGrid : MonoBehaviour
     private void OnShootedBubbleArrived(Bubble bubble)
     {
         shooterCurrentBubble.Arrived -= OnShootedBubbleArrived;
+        grid[_emptyCircleGridPos[0]][_emptyCircleGridPos[1]] = bubble;
+        shooterCurrentBubble = null;
         DisturbOthers(_emptyCircleGridPos);
         RemoveAnimationState(EnumAnimationStates.Shooting);
         CalculateAndAnimatePops(_emptyCircleGridPos);
@@ -475,15 +481,15 @@ public class BubbleGrid : MonoBehaviour
     }
 
 
-    void AddNewBubble(int lineIndex, int columnIndex, int number)
+    void AddNewBubble(Vector2Int gridPos, int number)
     {
         //add new line if needed
-        if (lineIndex == grid.Count)
+        if (gridPos[0] == grid.Count)
             grid.Add(new Bubble[BubblePerLine]);
         var newBubble = Instantiate(BubblePrefab, Holder.transform, true).GetComponent<Bubble>();
-        newBubble.transform.position = new Vector3(Holder.transform.position.x + columnIndex * bubbleSize + GetLineIndent(lineIndex), transform.position.y - (lineIndex + 1) * bubbleVerticalDistance, 0);
+        newBubble.transform.position = new Vector3(Holder.transform.position.x + gridPos[1] * bubbleSize + GetLineIndent(gridPos[0]), transform.position.y - (gridPos[0] + 1) * bubbleVerticalDistance, 0);
         newBubble.Number = number;
-        grid[lineIndex][columnIndex] = newBubble;
+        grid[gridPos[0]][gridPos[1]] = newBubble;
     }
 
     void AddNewLine(bool animate = true)
@@ -502,6 +508,8 @@ public class BubbleGrid : MonoBehaviour
         isFirstRight = !isFirstRight;
         for (int i = 0; i < BubblePerLine; i++)
         {
+            if (numbers[i] <= 0) //empty
+                continue;
             newLine[i] = Instantiate(BubblePrefab, Holder.transform, true).GetComponent<Bubble>();
             newLine[i].transform.position = new Vector3(Holder.transform.position.x + i * bubbleSize + GetLineIndent(0), transform.position.y, 0);
             newLine[i].Number = numbers[i];
@@ -592,19 +600,34 @@ public class BubbleGrid : MonoBehaviour
         }
     }
 
-    static void FindDeepConnectionsRecursive2(List<int[]> virtualGrid, bool isFirstRight, List<Vector2Int> ignoredPositions, List<BubbleConnection> sameLevelConnections)
+    static void FindDeepConnectionsRecursive(List<int[]> virtualGrid, bool isFirstRight, List<Vector2Int> ignoredPositions, BubbleConnection parentConnection)
     {
-        ignoredPositions.AddRange(sameLevelConnections.Select(c => c.GridPosition).ToList());
-        //As there is a exception on NextNumber for the first level, we call this once manually.
-        foreach (var sameLevelConnection in sameLevelConnections)
+
+        ignoredPositions.AddRange(parentConnection.Connections.Select(c => c.GridPosition).ToList());
+        var connectionGrid = GetConnectionGrid(virtualGrid, isFirstRight, ignoredPositions);
+
+        foreach (var sameLevelConnection in parentConnection.Connections)
         {
-            //as we found the same numbered connected bubbles and now we can check if this bubble is connected to wall by means of other bubbles
-            //we ignore these bubbles because we will merge them into this one.
-            sameLevelConnection.IsConnectedToTheTopWall = IsConnectedToTheTopWallRecursive(virtualGrid, isFirstRight, sameLevelConnection.GridPosition, ignoredPositions.ToList());
+
+            //As we add the current positions to the ignoredList, they will appear false.
+            //So, we need to check for each point again if they are adjacent to any position which is true.
+            var surroundingGridPositions = GetSurroundingBubbleGridPositions(virtualGrid, isFirstRight, sameLevelConnection.GridPosition);
+            sameLevelConnection.IsConnectedToTheTopWall = false;
+            foreach (var surroundingGridPosition in surroundingGridPositions)
+            {
+                if (connectionGrid[surroundingGridPosition[0]][surroundingGridPosition[1]])
+                {
+                    sameLevelConnection.IsConnectedToTheTopWall = true;
+                    break;
+                }
+            }
+
+            if(!sameLevelConnection.IsConnectedToTheTopWall)
+                continue;
             //imagining a merged point here
             var mergedLowLevelConnection = new BubbleConnection()
             {
-                Number = GetMergeResultNumber(sameLevelConnection.Number, sameLevelConnections.Count),
+                Number = GetMergeResultNumber(sameLevelConnection.Number, parentConnection.Connections.Count),
                 GridPosition = sameLevelConnection.GridPosition,
                 Connections = new List<BubbleConnection>()
             };
@@ -614,9 +637,41 @@ public class BubbleGrid : MonoBehaviour
             //now we got merged low level connection and its friends
             //if it got now friend, we say sorry and go back since we cannot merge further
             if (sameLevelConnection.Connections.Count == 1)
+            {
                 continue;
+            }
             //we send them to be foreach'ed until none of them have same level friends
-            FindDeepConnectionsRecursive2(virtualGrid, isFirstRight, ignoredPositions, sameLevelConnection.Connections);
+            FindDeepConnectionsRecursive(virtualGrid, isFirstRight, ignoredPositions, sameLevelConnection);
+        }
+
+        var pointsThatNotConnectedToWallForThisLevel = new List<Vector2Int>();
+        for (int i = 0; i < connectionGrid.Count; i++)
+        {
+            for (int j = 0; j < connectionGrid[i].Length; j++)
+            {
+                if (connectionGrid[i][j] == false)
+                {
+                    bool dontAdd = false;
+                    foreach (var sameLevelConnection in parentConnection.Connections)
+                    {
+                        //we already checked if this points are connected to wall ot not.
+                        //we need to protect them now.
+                        if (sameLevelConnection.IsConnectedToTheTopWall && sameLevelConnection.GridPosition[0] == i && sameLevelConnection.GridPosition[1] == j)
+                        {
+                            dontAdd = true;
+                            break;
+                        }
+                    }
+                    if(dontAdd)
+                        continue;
+                    pointsThatNotConnectedToWallForThisLevel.Add(new Vector2Int(i, j));
+                }
+            }
+        }
+
+        foreach (var sameLevelConnection in parentConnection.Connections)
+        {
+            sameLevelConnection.BubblesThatAreNotConnectedToWallAfterThisMerge = pointsThatNotConnectedToWallForThisLevel;
         }
     }
 
@@ -636,7 +691,7 @@ public class BubbleGrid : MonoBehaviour
             Connections = new List<BubbleConnection>()
         });
         GetConnectedBubblesWithSameNumberRecursive(virtualGrid, isFirstRight, rootConnection.Connections[0], new List<Vector2Int>(), rootConnection.Connections);
-        FindDeepConnectionsRecursive2(virtualGrid, isFirstRight, new List<Vector2Int>(), rootConnection.Connections);
+        FindDeepConnectionsRecursive(virtualGrid, isFirstRight, new List<Vector2Int>(), rootConnection);
 
         //Create depth list
         depthList = GetDepthListRecursive(rootConnection);
@@ -647,7 +702,7 @@ public class BubbleGrid : MonoBehaviour
         CalculateMergeDepthMap(virtualGrid, isFirstRight, bubbleGridPos, out rootConnection, out var depthList);
 
         desiredMergePath = null;
-        if (depthList.Count == 0)
+        if (depthList.Count == 0 || rootConnection.Connections.Count <= 1)
             return;
 
         //Find desired depth path
@@ -657,13 +712,30 @@ public class BubbleGrid : MonoBehaviour
         var maxDepth = depthList.Max(d => d.Count);
         var wantedDepth = Mathf.Lerp(minDepth, maxDepth, Globals.MergeDepthScale);
         float minDiff = Single.MaxValue;
+        List<List<int>> desiredPathList = new List<List<int>>();
         foreach (var depth in depthList)
         {
             var diff = Math.Abs(wantedDepth - depth.Count);
-            if (diff < minDiff)
+            if (diff <= minDiff)
             {
                 minDiff = diff;
-                desiredMergePath = depth;
+                desiredPathList.Add(depth);
+            }
+        }
+
+        var highestLineNumber = int.MaxValue;//high means physically high on the screen.
+        foreach (var path in desiredPathList)
+        {
+            var lastConnection = rootConnection;
+            for (int d = 0; d < path.Count; d++)
+            {
+                lastConnection = lastConnection.Connections[path[d]];
+            }
+
+            if (lastConnection.GridPosition[0] <= highestLineNumber)
+            {
+                highestLineNumber = lastConnection.GridPosition[0];
+                desiredMergePath = path;
             }
         }
         if (desiredMergePath == null)
@@ -675,15 +747,11 @@ public class BubbleGrid : MonoBehaviour
     {
         GetDesiredMergePath(GetNewVirtualGrid(grid), isFirstRight, bubbleGridPos, out var rootConnection, out var desiredMergePath);
 
-        if (desiredMergePath == null || rootConnection == null)
-            return;
-
         //Animate merging and popping
         nextConnection = rootConnection;
         nextPath = desiredMergePath;
 
-        startMergeIn = Globals.WaitSecondsBeforeMerge;
-        AddAnimationState(EnumAnimationStates.WaitingToMerge);
+        ApplyMergePath();
     }
 
 
@@ -693,15 +761,25 @@ public class BubbleGrid : MonoBehaviour
     private List<int> nextPath = null;
     void ApplyMergePath()
     {
-        if (!nextPath.Any())
+        if (nextConnection == null || nextPath == null || nextConnection.Connections.Count <= 1 || !nextPath.Any())
         {
+            if(nextConnection != null)
+                ThrowBubblesFromGrid(nextConnection.BubblesThatAreNotConnectedToWallAfterThisMerge);
             RemoveAnimationState(EnumAnimationStates.Merging);
+            RemoveAnimationState(EnumAnimationStates.WaitingToMerge);
             AddNewBubbleToWaitingQueue();
             PutNextBubbleToShooter();
             if (grid.Count < 4 || grid.Sum(l => l.Count(b => b != null)) < 18 && grid.Count < 8)
                 AddNewLine();
             return;
         }
+        if (!IsInAnimationState(EnumAnimationStates.WaitingToMerge) && !IsInAnimationState(EnumAnimationStates.Merging))
+        {
+            startMergeIn = Globals.WaitSecondsBeforeMerge;
+            AddAnimationState(EnumAnimationStates.WaitingToMerge);
+            return;
+        }
+
         toBeArrivedCount = 0;
         var connection = this.nextConnection;
         if (!connection.Connections.Any())
@@ -727,19 +805,43 @@ public class BubbleGrid : MonoBehaviour
             bubble.Arrived += OnBubbleArriveMergePoint;
             toBeArrivedCount++;
         }
-        AddScore(connection.Number * 10);
 
-        //var newConnection = new BubbleConnection()
-        //{
-        //    Number = GetMergeResultNumber(nextConnection.Number, connection.Connections.Count),
-        //    GridPosition = nextConnection.GridPosition,
-        //    Connections = new List<BubbleConnection>()
-        //};
-        //nextConnection.Connections.Add(newConnection);
+        ThrowBubblesFromGrid(connection.BubblesThatAreNotConnectedToWallAfterThisMerge);
+        AddScore(nextConnection.Number * connection.Connections.Count);
 
         nextPath.RemoveAt(0);
         if (nextPath.Any())
             IncreaseMultiplier();
+    }
+
+    private void ThrowBubblesFromGrid(List<Vector2Int> bubblesThatAreNotConnectedToWallAfterThisMerge)
+    {
+        if(bubblesThatAreNotConnectedToWallAfterThisMerge == null)
+            return;
+        foreach (var bubbleGridPos in bubblesThatAreNotConnectedToWallAfterThisMerge)
+        {
+            var bubble = GetBubble(grid, bubbleGridPos);
+            if (bubble != null)
+            {
+                bubble.LeaveTheGrid();
+                grid[bubbleGridPos[0]][bubbleGridPos[1]] = null;
+            }
+        }
+        //remove empty lines from the grid
+        for (int g = grid.Count - 1; g >= 0; g--)
+        {
+            var found = false;
+            for (int i = 0; i < grid[g].Length; i++)
+            {
+                if (grid[g][i] != null)
+                {
+                    found = true;
+                    break;
+                }
+            }
+            if(!found)
+                grid.RemoveAt(g);
+        }
     }
 
     private int toBeArrivedCount;
@@ -750,7 +852,7 @@ public class BubbleGrid : MonoBehaviour
         if (toBeArrivedCount <= 0)
         {
             var newConnection = nextConnection.Connections[0];
-            AddNewBubble(newConnection.GridPosition[0], newConnection.GridPosition[1], newConnection.Number);
+            AddNewBubble(newConnection.GridPosition, newConnection.Number);
             if (newConnection.Number == 2048)
             {
                 //TODO: collect points from this
@@ -823,16 +925,42 @@ public class BubbleGrid : MonoBehaviour
         return myList;
     }
 
-    static bool IsConnectedToTheTopWallRecursive(List<int[]> virtualGrid, bool isFirstRight, Vector2Int gridPos, List<Vector2Int> visitedPoints)
+
+    static List<bool[]> GetConnectionGrid(List<int[]> virtualGrid, bool isFirstRight, List<Vector2Int> ignoredPositions)
+    {
+        var connectionGrid = virtualGrid.Select(v => new bool[6]).ToList();
+        for (int c = 0; c < BubblePerLine; c++)
+        {
+            SwarmAndMarkConnectedPositionsRecursive(virtualGrid, isFirstRight, new Vector2Int(0, c),  ignoredPositions, connectionGrid);
+        }
+        return connectionGrid;
+    }
+
+    static void SwarmAndMarkConnectedPositionsRecursive(List<int[]> virtualGrid, bool isFirstRight, Vector2Int gridPos, List<Vector2Int> ignoredPositions, List<bool[]> connectionGrid)
+    {
+        var surroundingGridPositions = GetSurroundingBubbleGridPositions(virtualGrid, isFirstRight, gridPos);
+        foreach (var surroundingGridPosition in surroundingGridPositions)
+        {
+            if (ignoredPositions.Any(v => v[0] == surroundingGridPosition[0] && v[1] == surroundingGridPosition[1]))
+                continue;
+            if(connectionGrid[surroundingGridPosition[0]][surroundingGridPosition[1]])
+                continue;
+            connectionGrid[surroundingGridPosition[0]][surroundingGridPosition[1]] = true;
+            SwarmAndMarkConnectedPositionsRecursive(virtualGrid, isFirstRight, surroundingGridPosition, ignoredPositions, connectionGrid);
+        }
+    }
+
+    static bool IsConnectedToTheTopWallRecursive(List<int[]> virtualGrid, bool isFirstRight, Vector2Int gridPos, List<Vector2Int> visitedPoints, List<Vector2Int> pointsConnectedToTheTopWall, List<Vector2Int> pointsNotConnectedToTheTopWall)
     {
         visitedPoints.Add(gridPos);
 
         //swarm to all 6 directions
         var directions = new EnumDirections[]
         {
-            EnumDirections.Left,
+            //ordered in this way to be quicker
             EnumDirections.LeftUp,
             EnumDirections.RightUp,
+            EnumDirections.Left,
             EnumDirections.Right,
             EnumDirections.RightDown,
             EnumDirections.LeftDown
@@ -846,18 +974,21 @@ public class BubbleGrid : MonoBehaviour
             //If there is no bubble on this direction, what are we doing here.
             if (virtualGrid[dirGridPos[0]][dirGridPos[1]] == 0)
                 continue;
-            //If we touch the top wall, go and tell everyone!
-            if (dirGridPos[0] == 0)
-                return true;
-            var isVisited = visitedPoints.Any(v => v[0] == dirGridPos[0] && v[1] == dirGridPos[1]);
-            if (!isVisited)
-            {
-                if (IsConnectedToTheTopWallRecursive(virtualGrid, isFirstRight, dirGridPos, visitedPoints))
-                    return true;
-            }
+            if (visitedPoints.Any(v => v[0] == dirGridPos[0] && v[1] == dirGridPos[1]))
+                continue;
+            if (pointsConnectedToTheTopWall.Any(v => v[0] == dirGridPos[0] && v[1] == dirGridPos[1]))
+                continue;
+            if (pointsNotConnectedToTheTopWall.Any(v => v[0] == dirGridPos[0] && v[1] == dirGridPos[1]))
+                continue;
+
+            if (IsConnectedToTheTopWallRecursive(virtualGrid, isFirstRight, dirGridPos, visitedPoints, pointsConnectedToTheTopWall, pointsNotConnectedToTheTopWall))
+                pointsConnectedToTheTopWall.Add(dirGridPos);
+            else
+                pointsNotConnectedToTheTopWall.Add(dirGridPos);
         }
 
-        return false;
+        //we are either touching the top wall or connected to someone who does
+        return gridPos[0] == 0 || pointsConnectedToTheTopWall.Any();
     }
 
     static int GetMergeResultNumber(int number, int count)
@@ -873,9 +1004,9 @@ public class BubbleGrid : MonoBehaviour
     {
         public bool IsConnectedToTheTopWall { get; set; }
         public int Number { get; set; }
-
         public Vector2Int GridPosition { get; set; }
         public List<BubbleConnection> Connections { get; set; }
+        public List<Vector2Int> BubblesThatAreNotConnectedToWallAfterThisMerge { get; set; }
     }
 
     static int GetRandomNumber()
@@ -946,10 +1077,10 @@ public class BubbleGrid : MonoBehaviour
         //swarm to all 6 directions
         var directions = new EnumDirections[]
         {
-            EnumDirections.Left,
-            EnumDirections.LeftUp,
-            EnumDirections.RightUp,
             EnumDirections.Right,
+            EnumDirections.RightUp,
+            EnumDirections.LeftUp,
+            EnumDirections.Left,
             EnumDirections.RightDown,
             EnumDirections.LeftDown
         };
@@ -976,6 +1107,7 @@ public class BubbleGrid : MonoBehaviour
 
 
         ////REMOVE
+        ////this code shows where are the edges. use this to find bugs
         //foreach (var newGridPos in edgePositions)
         //{
         //    var bubble = Instantiate(BubblePrefab, Holder.transform, true).GetComponent<Bubble>();
@@ -993,9 +1125,6 @@ public class BubbleGrid : MonoBehaviour
         virtualGrid.Add(new int[BubblePerLine]); //we will be putting temporary bubbles on edges to test. so we need an extra line.
         foreach (var edgePos in edgePositions)
         {
-            //get numbers of surrouding bubbles
-            var surroundingBubblePositions = GetSurroundingBubbleGridPositions(virtualGrid, isFirstRight, edgePos);
-
             //get depth path for each numbers on the edgePos
             var surroundingBubbleNumbers = GetSurroundingBubbleNumbers(virtualGrid, isFirstRight, edgePos);
             foreach (var surroundingBubbleNumberCount in surroundingBubbleNumbers)
@@ -1005,6 +1134,8 @@ public class BubbleGrid : MonoBehaviour
                 virtualGrid[edgePos[0]][edgePos[1]] = surroundingNumber;
                 GetDesiredMergePath(virtualGrid, isFirstRight, edgePos, out _, out var desiredMergePath);
                 virtualGrid[edgePos[0]][edgePos[1]] = 0;
+                if(desiredMergePath == null)
+                    continue;
                 numberMergeDepthArray[Globals.NumberIndexDic[surroundingNumber]][0] += surroundingBubbleNumberCount.Value; //how many possible merge points for this number
                 numberMergeDepthArray[Globals.NumberIndexDic[surroundingNumber]][1] += desiredMergePath.Count; //sum of all merge points' merge count
             }
