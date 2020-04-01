@@ -18,6 +18,7 @@ public class BubbleGrid : MonoBehaviour
     public Text TxtMultiplier;
     public Text TxtMultiplierBig;
     public Animator MultiplierAnimator;
+    public Animator CameraAnimator;
 
 
     public LevelMeter LevelMeter;
@@ -51,6 +52,7 @@ public class BubbleGrid : MonoBehaviour
         TxtMultiplier.color = Globals.GetLevelColor(_multiplier * 2); //multiplying by 2 to get different colors than levels
         TxtMultiplierBig.text = TxtMultiplier.text;
         MultiplierAnimator.Play("MultiplierTextGrow", 0, 0);
+        CameraAnimator.Play("CameraShakeMinimal", 0, 0);
     }
     private void ResetMultiplier()
     {
@@ -73,7 +75,7 @@ public class BubbleGrid : MonoBehaviour
     }
     static float GetLevel(float score)
     {
-        return (float)Math.Sqrt(score) / 20;
+        return (float)Math.Sqrt(score * 5) / 20;
     }
 
     enum EnumAnimationStates
@@ -81,9 +83,10 @@ public class BubbleGrid : MonoBehaviour
         NoAnimation = 0,
         PuttingBubbleToShooter = 1,
         AddingNewLine = 2,
-        Shooting = 4,
-        WaitingToMerge = 8,
-        Merging = 16
+        RemovingNewLine = 4,
+        Shooting = 8,
+        WaitingToMerge = 16,
+        Merging = 32
     }
 
     //Using binary state to keep more than one state at a time.
@@ -125,6 +128,14 @@ public class BubbleGrid : MonoBehaviour
         AddScore(0);
     }
 
+    void InitGrid()
+    {
+        AddNewLine(new int[] { 128, 32, 2, 4, 32, 2 }, false);
+        AddNewLine(new int[] { 2, 16, 8, 16, 64, 4 }, false);
+        AddNewLine(new int[] { 2, 4, 8, 16, 128, 4 }, false);
+        AddNewLine(new int[] { 2, 256, 8, 16, 64, 4 }, false);
+    }
+
     Vector3 GlobalPositionToScaledHolderPosition(Vector3 position)
     {
         return new Vector3(
@@ -145,7 +156,7 @@ public class BubbleGrid : MonoBehaviour
         waitingQueue.RemoveAt(0);
         shooterCurrentBubble.transform.position = new Vector3(shooterCurrentBubble.transform.position.x, shooterCurrentBubble.transform.position.y, BubblePrefab.transform.localPosition.z);
         shooterCurrentBubble.ScaleTo(new List<Vector2>() { shooterCurrentBubble.transform.localScale / 0.7f }, 0.6f);
-        shooterCurrentBubble.MoveTo(new List<Vector3>() { GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position) }, waitingToShooterMoveSpeed);
+        shooterCurrentBubble.MoveToGlobal(new List<Vector3>() { shooterPos }, waitingToShooterMoveSpeed);
         AddAnimationState(EnumAnimationStates.PuttingBubbleToShooter);
         shooterCurrentBubble.Arrived += OnBubbleArrivedToShooter;
     }
@@ -196,8 +207,7 @@ public class BubbleGrid : MonoBehaviour
             {
                 Holder.transform.localPosition = Vector3.MoveTowards(Holder.transform.localPosition, holderTargetPos, holderScrollSpeed * Time.deltaTime * Globals.AnimationSpeedScale);
                 //We move the shooter bubble and queue bubbles so they stay where they were comparing to screen.
-                //shooterCurrentBubble.transform.localPosition = GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position);
-                //shooterCurrentBubble.MoveTo(new List<Vector3>() {GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position)}, waitingToShooterMoveSpeed);
+                shooterCurrentBubble.transform.position = new Vector3(shooterCurrentBubble.transform.position.x, shooterPos.y, shooterCurrentBubble.transform.position.z);
                 foreach (Bubble bubble in waitingQueue.ToArray())
                 {
                     bubble.transform.localPosition = GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position + new Vector3(-bubbleSize, 0));
@@ -205,6 +215,26 @@ public class BubbleGrid : MonoBehaviour
                 if (Vector3.Distance(Holder.transform.localPosition, holderTargetPos) < 0.001f)
                 {
                     RemoveAnimationState(EnumAnimationStates.AddingNewLine);
+                }
+            }else if (IsInAnimationState(EnumAnimationStates.RemovingNewLine))
+            {
+                Holder.transform.localPosition = Vector3.MoveTowards(Holder.transform.localPosition, holderTargetPos, holderScrollSpeed * Time.deltaTime * Globals.AnimationSpeedScale);
+                //We move the shooter bubble and queue bubbles so they stay where they were comparing to screen.
+                shooterCurrentBubble.transform.position = new Vector3(shooterPos.x, shooterPos.y, shooterCurrentBubble.transform.position.z);
+                foreach (Bubble bubble in waitingQueue.ToArray())
+                {;
+                    bubble.transform.localPosition = GlobalPositionToScaledHolderPosition(shooterPos - Holder.transform.position + new Vector3(-bubbleSize, 0));
+                }
+                if (Vector3.Distance(Holder.transform.localPosition, holderTargetPos) < 0.001f)
+                {
+                    foreach (var bubble in grid[0])
+                    {
+                        if(bubble)
+                            Destroy(bubble.gameObject);
+                    }
+                    grid.RemoveAt(0);
+                    isFirstRight = !isFirstRight;
+                    RemoveAnimationState(EnumAnimationStates.RemovingNewLine);
                 }
             }
 
@@ -222,14 +252,6 @@ public class BubbleGrid : MonoBehaviour
         }
     }
 
-    void InitGrid()
-    {
-        AddNewLine(new int[] { 0,0,0,0,0,0}, false);
-        AddNewLine(new int[] { 0,0,0,0,512,0}, false);
-        AddNewLine(new int[] { 0,0,0,0,4,2}, false);
-        AddNewLine(new int[] { 0,0,0,0,0,4}, false);
-        AddNewLine(new int[] { 0,0,0,0,8,16}, false);
-    }
 
 
     void RaycastAimLine()
@@ -526,6 +548,12 @@ public class BubbleGrid : MonoBehaviour
 
     }
 
+    void RemoveNewLine()
+    {
+        //if bubbles got too close to shooter, we move them back
+        holderTargetPos = new Vector3(Holder.transform.localPosition.x, Holder.transform.localPosition.y + bubbleVerticalDistance, Holder.transform.localPosition.z);
+        AddAnimationState(EnumAnimationStates.RemovingNewLine);
+    }
 
 
 
@@ -767,10 +795,15 @@ public class BubbleGrid : MonoBehaviour
                 ThrowBubblesFromGrid(nextConnection.BubblesThatAreNotConnectedToWallAfterThisMerge);
             RemoveAnimationState(EnumAnimationStates.Merging);
             RemoveAnimationState(EnumAnimationStates.WaitingToMerge);
-            AddNewBubbleToWaitingQueue();
+            if(Random.Range(0,100) % 2 == 0)
+                AddNewBubbleToWaitingQueue();
+            else
+                AddNewBubbleToWaitingQueue(GetRandomNumber());
             PutNextBubbleToShooter();
             if (grid.Count < 4 || grid.Sum(l => l.Count(b => b != null)) < 18 && grid.Count < 8)
                 AddNewLine();
+            else if (grid.Count > 8)
+                RemoveNewLine();
             return;
         }
         if (!IsInAnimationState(EnumAnimationStates.WaitingToMerge) && !IsInAnimationState(EnumAnimationStates.Merging))
@@ -793,17 +826,30 @@ public class BubbleGrid : MonoBehaviour
             return;
         }
         nextConnection = connection.Connections[nextPath[0]];
-        var targetPosition = new List<Vector3>()
+        var targetBubble = grid[nextConnection.GridPosition[0]][nextConnection.GridPosition[1]];
+        List<Vector3> targetPosition = new List<Vector3>();
+        if (!targetBubble)
         {
-            grid[nextConnection.GridPosition[0]][nextConnection.GridPosition[1]].transform.localPosition
-        };
-        foreach (var childConnection in connection.Connections)
+            foreach (var childConnection in connection.Connections)
+            {
+                var bubble = grid[childConnection.GridPosition[0]][childConnection.GridPosition[1]];
+                grid[childConnection.GridPosition[0]][childConnection.GridPosition[1]] = null;
+                bubble.MoveTo(new List<Vector3>(){ bubble.transform.localPosition }, 1f);
+                bubble.Arrived += OnBubbleArriveMergePoint;
+                toBeArrivedCount++;
+            }
+        }
+        else
         {
-            var bubble = grid[childConnection.GridPosition[0]][childConnection.GridPosition[1]];
-            grid[childConnection.GridPosition[0]][childConnection.GridPosition[1]] = null;
-            bubble.MoveTo(targetPosition, 1f);
-            bubble.Arrived += OnBubbleArriveMergePoint;
-            toBeArrivedCount++;
+            targetPosition.Add(grid[nextConnection.GridPosition[0]][nextConnection.GridPosition[1]].transform.localPosition);
+            foreach (var childConnection in connection.Connections)
+            {
+                var bubble = grid[childConnection.GridPosition[0]][childConnection.GridPosition[1]];
+                grid[childConnection.GridPosition[0]][childConnection.GridPosition[1]] = null;
+                bubble.MoveTo(targetPosition, 1f);
+                bubble.Arrived += OnBubbleArriveMergePoint;
+                toBeArrivedCount++;
+            }
         }
 
         ThrowBubblesFromGrid(connection.BubblesThatAreNotConnectedToWallAfterThisMerge);
@@ -816,7 +862,7 @@ public class BubbleGrid : MonoBehaviour
 
     private void ThrowBubblesFromGrid(List<Vector2Int> bubblesThatAreNotConnectedToWallAfterThisMerge)
     {
-        if(bubblesThatAreNotConnectedToWallAfterThisMerge == null)
+        if (bubblesThatAreNotConnectedToWallAfterThisMerge == null)
             return;
         foreach (var bubbleGridPos in bubblesThatAreNotConnectedToWallAfterThisMerge)
         {
@@ -857,6 +903,7 @@ public class BubbleGrid : MonoBehaviour
             {
                 //TODO: collect points from this
                 PopAllBubblesAround(newConnection.GridPosition);
+                CameraAnimator.Play("CameraShake", 0, 0);
             }
             ApplyMergePath();
         }
@@ -1009,9 +1056,13 @@ public class BubbleGrid : MonoBehaviour
         public List<Vector2Int> BubblesThatAreNotConnectedToWallAfterThisMerge { get; set; }
     }
 
-    static int GetRandomNumber()
+
+    static int GetRandomNumber(float pivot = 0.3f, float distance = 0.5f)
     {
-        return (int)Math.Pow(2, Random.Range(1, 9));
+        var pivotIndex = 9 * pivot;
+        var index = (int)Mathf.Clamp(Mathf.Floor(Random.value * pivotIndex + Random.value * distance * 11), 1, 9);
+        return (int)Math.Pow(2, index);
+        //return (int)Math.Pow(2, Random.Range(1, 9));
     }
     static bool IsLineRight(bool isFirstRight, int lineIndex)
     {

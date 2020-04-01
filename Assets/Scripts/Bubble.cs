@@ -72,8 +72,17 @@ public class Bubble : MonoBehaviour
     private float moveSpeed = 0;
     public void MoveTo(List<Vector3> targetPositions, float speed)
     {
+        this.targetPositionsGlobal.Clear();
         this.targetPositions = targetPositions.ToList();
         moveSpeed = speed;
+    }
+    private List<Vector3> targetPositionsGlobal = new List<Vector3>();
+    private float moveSpeedGlobal = 0;
+    public void MoveToGlobal(List<Vector3> targetPositionsGlobal, float speedGlobal)
+    {
+        this.targetPositions.Clear();
+        this.targetPositionsGlobal = targetPositionsGlobal.ToList();
+        moveSpeedGlobal = speedGlobal;
     }
 
     private List<Vector2> targetScales = new List<Vector2>();
@@ -134,6 +143,16 @@ public class Bubble : MonoBehaviour
             {
                 targetPositions.RemoveAt(0);
                 if(targetPositions.Count == 0)
+                    Arrived?.Invoke(this);
+            }
+        }
+        else if (targetPositionsGlobal.Count > 0)
+        {
+            transform.position = Vector3.MoveTowards(transform.position, targetPositionsGlobal[0], moveSpeedGlobal * Time.deltaTime * Globals.AnimationSpeedScale);
+            if (Vector3.Distance(transform.position, targetPositionsGlobal[0]) < 0.001f)
+            {
+                targetPositionsGlobal.RemoveAt(0);
+                if (targetPositionsGlobal.Count == 0)
                     Arrived?.Invoke(this);
             }
         }
